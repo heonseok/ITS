@@ -60,8 +60,13 @@ class DQN(object):
         print('Copy is done')
 
     def predict_Q_value(self, state):
-        #print('State')
-        #print(state)
+        '''
+        print('State')
+        print(state)
+        print(state.shape)
+        print([state])
+        '''
+        #return self.sess.run(self.prediction_Q, feed_dict={self.states: state})
         return self.sess.run(self.prediction_Q, feed_dict={self.states: [state]})
 
     def train_network(self):

@@ -41,6 +41,8 @@ class DKVMNEnvironment(Environment):
 
         self.value_matrix = self.sess.run(self.env.init_memory_value)  
         self.state_shape = list(self.value_matrix.shape)
+        print('state shape')
+        print(self.state_shape)
 
     def new_episode(self):
         print('NEW EPISODE')
@@ -84,6 +86,8 @@ class DKVMNEnvironment(Environment):
             self.reward = np.sum(read_diff)
         elif self.args.reward_type == 'summary':
             self.reward = np.sum(summary_diff)
+        elif self.args.reward_type == 'prob':
+            self.reward = np.sum(prob_diff)
 
         ######## calculate probabilty for total problems
         #total_preds = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
