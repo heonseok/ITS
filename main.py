@@ -115,8 +115,8 @@ def main():
         ########## DQN ##########
         parser.add_argument('--env_name', type=str, choices=['CartPole-v0', 'DKVMN'], default='DKVMN')
         parser.add_argument('--batch_size_dqn', type=int, default=32)
-        parser.add_argument('--max_step', type=int, default=100000)
-        parser.add_argument('--max_exploration_step', type=int, default=100000)
+        parser.add_argument('--max_step', type=int, default=1000000)
+        parser.add_argument('--max_exploration_step', type=int, default=1000000)
 
         parser.add_argument('--replay_memory_size', type=int, default=10000)
 
@@ -131,7 +131,7 @@ def main():
         parser.add_argument('--save_interval', type=int, default=4000)
         parser.add_argument('--show_interval', type=int, default=4000)
         parser.add_argument('--episode_maxstep', type=int, default=500)
-        parser.add_argument('--learning_rate', type=float, default=0.01)
+        parser.add_argument('--learning_rate', type=float, default=0.1)
 
         parser.add_argument('--dqn_checkpoint_dir', type=str, default='DQN/checkpoint')
         parser.add_argument('--dqn_log_dir', type=str, default='DQN/log')
@@ -191,7 +191,6 @@ def main():
                 myArgs.seq_len = 1
                 dkvmn.init_step()
                 dkvmn.ideal_test()
-                #dkvmn.ideal_test(myArgs.dkvmn_ideal_test_input_type)
             
             ##### DQN #####
             '''
@@ -212,7 +211,6 @@ def main():
                 myArgs.seq_len = 1
                 myAgent = DKVMNAgent(myArgs, sess, dkvmn)
                 dkvmn.init_step()
-                #dkvmn.init_total_prediction_probability()
 
             if myArgs.dqn_train:
                 if os.path.exists('./train.csv'):

@@ -57,8 +57,14 @@ class DKVMNEnvironment(Environment):
     def check_terminal(self, total_pred_probs):
         return False
 
+    def baseline_act(self):
+        total_preds = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
+        best_prob_index = np.argmax(total_preds)
+        print('Action:%d, prob:%3.4f' % (best_prob_index+1, total_preds[best_prob_index]))
+        return best_prob_index+1, total_preds[best_prob_index]
+
     def act(self, action):
-        action = np.asarray(action, dtype=np.int32)
+        action = np.asarray(action+1, dtype=np.int32)
         action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
 
         # -1 for sampling 
@@ -67,10 +73,10 @@ class DKVMNEnvironment(Environment):
         answer = np.asarray(-1, dtype=np.int32)
         answer = np.expand_dims(np.expand_dims(answer, axis=0), axis=0)
 
-        prev_value_matrix = self.value_matrix
+        #prev_value_matrix = self.value_matrix
 
         ops = [self.env.stepped_value_matrix, self.env.value_matrix_difference, self.env.read_content_difference, self.env.summary_difference, self.env.qa, self.env.stepped_pred_prob, self.env.pred_prob_difference]
-        self.value_matrix, val_diff, read_diff, summary_diff, qa, stepped_prob, prob_diff = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: prev_value_matrix})
+        self.value_matrix, val_diff, read_diff, summary_diff, qa, stepped_prob, prob_diff = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})
         
         if self.args.reward_type == 'value':
             self.reward = np.sum(val_diff) 
@@ -85,6 +91,9 @@ class DKVMNEnvironment(Environment):
 
         self.episode_step += 1
 
+        # For scaling
+        self.reward = self.reward/100
+        
         total_pred_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
         print('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
         if self.episode_step == self.args.episode_maxstep:
@@ -97,4 +106,4 @@ class DKVMNEnvironment(Environment):
         return np.squeeze(self.value_matrix), self.reward, terminal
 
     def random_action(self):
-        return random.randrange(2, self.num_actions+1)
+        return random.randrange(0, self.num_actions)

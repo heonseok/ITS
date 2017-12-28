@@ -27,6 +27,8 @@ class Agent(object):
 
         self.dqn.update_target_network()
 
+    #def process_state(self, next_state):
+        #self.state = next_state
 
     def train(self):
         print('Agent is training')
@@ -87,7 +89,7 @@ class Agent(object):
             while not terminal:
                 action = self.select_action()
                 next_state, reward, terminal = self.env.act(action)
-                self.process_state(next_state)
+                #self.process_state(next_state)
 
                 current_reward += reward
                 if terminal:
@@ -95,10 +97,9 @@ class Agent(object):
 
             if current_reward > best_reward:
                 best_reward = current_reward
-            print('<%d> Current reward: %d' % (episode, current_reward))
+            print('<%d> Current episode reward: %f' % (episode, current_reward))
             print('='*30)
-            print('Best reward : %d' % (best_reward))
-
+            print('Best episode reward : %f' % (best_reward))
 
     def select_action(self):
         if self.args.dqn_train:
@@ -113,7 +114,8 @@ class Agent(object):
             #print(self.env.value_matrix.shape)
             q = self.dqn.predict_Q_value(np.squeeze(self.env.value_matrix))[0]
             action = np.argmax(q)
-            #print('\nQ value %s and action %d' % (q,action))
+            val_sum = np.sum(self.env.value_matrix)
+            print('\nQ value %s and action %d sum %f' % (q, action+1, val_sum))
         return action 
 
     def write_log(self, episode_count, episode_reward):
@@ -158,8 +160,8 @@ class SimpleAgent(Agent):
     def reset_episode(self):
         self.state = self.env.new_episode()
 
-    def process_state(self, next_state):
-        self.state = next_state
+    #def process_state(self, next_state):
+        #self.state = next_state
 
 
 class DKVMNAgent(Agent):
@@ -173,8 +175,8 @@ class DKVMNAgent(Agent):
 
     def reset_episode(self):
         self.env.new_episode()
-        self.write_log(self.episode_count, self.episode_reward)
+        #self.write_log(self.episode_count, self.episode_reward)
         self.env.episode_step = 0
-        print('Episode rewards :%3.4f' % self.episode_reward)
+        #print('Episode rewards :%3.4f' % self.episode_reward)
         self.episode_reward = 0
 

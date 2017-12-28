@@ -37,8 +37,9 @@ class DQN(object):
 
     def build_network(self, name):
         with tf.variable_scope(name):
-            fc1 = tf.layers.dense(inputs=tf.reshape(self.states, (-1, np.prod(self.input_shape))), units=10, activation=tf.nn.relu, kernel_initializer=self.kernel_initializer)
-            Q = tf.layers.dense(inputs=fc1, units=self.num_actions, activation=None, kernel_initializer=self.kernel_initializer)
+            fc1 = tf.layers.dense(inputs=tf.reshape(self.states, (-1, np.prod(self.input_shape))), units=512, activation=tf.nn.relu, kernel_initializer=self.kernel_initializer)
+            fc2 = tf.layers.dense(inputs=fc1, units=128, activation=tf.nn.relu, kernel_initializer=self.kernel_initializer)
+            Q = tf.layers.dense(inputs=fc2, units=self.num_actions, activation=None, kernel_initializer=self.kernel_initializer)
             return Q
 
     def build_optimizer(self):
@@ -59,6 +60,8 @@ class DQN(object):
         print('Copy is done')
 
     def predict_Q_value(self, state):
+        #print('State')
+        #print(state)
         return self.sess.run(self.prediction_Q, feed_dict={self.states: [state]})
 
     def train_network(self):

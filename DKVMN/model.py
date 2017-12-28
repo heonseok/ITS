@@ -14,28 +14,11 @@ class DKVMNModel():
         self.args = args
         self.name = name
         self.sess = sess
-        #self.batch_size = args.batch_size
 
         tf.set_random_seed(224)
 
         self.init_model()
         self.init_total_prediction_probability()
-    
-    def sampling_a_given_q(self, q, value_matrix):
-        q_embed = self.embedding_q(q)
-        correlation_weight = self.memory.attention(q_embed)
-
-        _, _, _, pred_prob = self.inference(q_embed, correlation_weight, value_matrix, reuse_flag = True)
-
-        # TODO : arguemnt check for various algorithms
-        pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
-
-        threshold = tf.random_uniform(pred_prob.shape)
-
-        a = tf.cast(tf.less(threshold, pred_prob), tf.int32)
-        qa = q + tf.multiply(a, self.args.n_questions)[0]
-
-        return qa 
 
     def inference(self, q_embed, correlation_weight, value_matrix, reuse_flag):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
@@ -129,9 +112,6 @@ class DKVMNModel():
              pred_prob_reshaped = tf.reshape(pred_prob, [self.args.batch_size, -1])
              return tf.concat([pred_prob_reshaped, qa_embed], 1)
 
-    def extract_a_from_qa(self, qa):
-        return tf.cast(tf.greater(qa, tf.constant(self.args.n_questions)), tf.float32)
-
     def init_model(self):
         # 'seq_len' means question sequences
         self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
@@ -156,7 +136,7 @@ class DKVMNModel():
 
             q = tf.squeeze(slice_q_data[i], 1)
             qa = tf.squeeze(slice_qa_data[i], 1)
-            a = self.extract_a_from_qa(qa)
+            a = tf.cast(tf.greater(qa, tf.constant(self.args.n_questions)), tf.float32)
 
             q_embed = self.embedding_q(q)
             qa_embed = self.embedding_qa(qa)
@@ -342,9 +322,6 @@ class DKVMNModel():
 
         return best_epoch    
     
-        
-             
-    
     def test(self, test_q, test_qa):
         steps = test_q.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
@@ -403,6 +380,22 @@ class DKVMNModel():
         
 
 ########################################################## FOR Reinforcement Learning ##############################################################
+
+    def sampling_a_given_q(self, q, value_matrix):
+        q_embed = self.embedding_q(q)
+        correlation_weight = self.memory.attention(q_embed)
+
+        _, _, _, pred_prob = self.inference(q_embed, correlation_weight, value_matrix, reuse_flag = True)
+
+        # TODO : arguemnt check for various algorithms
+        pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
+
+        threshold = tf.random_uniform(pred_prob.shape)
+
+        a = tf.cast(tf.less(threshold, pred_prob), tf.int32)
+        qa = q + tf.multiply(a, self.args.n_questions)[0]
+
+        return qa 
 
     def init_step(self):
         # q : action for RL
@@ -466,7 +459,7 @@ class DKVMNModel():
 
         log_file = open(log_file_name, 'w')
         value_matrix = self.sess.run(self.init_memory_value)
-        for i in range(100):
+        for i in range(20):
 
             for q_idx in range(1, self.args.n_questions+1):
                 q = np.expand_dims(np.expand_dims(q_idx, axis=0), axis=0) 
