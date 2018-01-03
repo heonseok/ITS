@@ -12,10 +12,12 @@ class DQN(object):
         self.env = environment
         self.num_actions = self.env.num_actions
         self.input_shape = self.memory.state_shape
+        print('input shape')
+        print(self.input_shape)
 
 
         self.kernel_initializer = tf.truncated_normal_initializer(mean=0.0, stddev=0.02)
-        self.bias_initializer = tf.constant_initializer(0.05)
+        #self.bias_initializer = tf.constant_initializer(0.05)
 
         self.states = tf.placeholder(tf.float32, [None] + self.input_shape)
         self.actions = tf.placeholder(tf.uint8, [None])
@@ -37,9 +39,9 @@ class DQN(object):
 
     def build_network(self, name):
         with tf.variable_scope(name):
-            fc1 = tf.layers.dense(inputs=tf.reshape(self.states, (-1, np.prod(self.input_shape))), units=512, activation=tf.nn.relu, kernel_initializer=self.kernel_initializer)
-            fc2 = tf.layers.dense(inputs=fc1, units=128, activation=tf.nn.relu, kernel_initializer=self.kernel_initializer)
-            Q = tf.layers.dense(inputs=fc2, units=self.num_actions, activation=None, kernel_initializer=self.kernel_initializer)
+            fc1 = tf.layers.dense(inputs=tf.reshape(self.states, (-1, np.prod(self.input_shape))), units=512, activation=tf.nn.sigmoid, kernel_initializer=self.kernel_initializer)
+            #fc2 = tf.layers.dense(inputs=fc1, units=128, activation=tf.nn.sigmoid, kernel_initializer=self.kernel_initializer)
+            Q = tf.layers.dense(inputs=fc1, units=self.num_actions, activation=None, kernel_initializer=self.kernel_initializer)
             return Q
 
     def build_optimizer(self):
@@ -48,7 +50,8 @@ class DQN(object):
         action_one_hot = tf.one_hot(indices=self.actions, depth=self.num_actions, on_value=1.0, off_value=0.0)
         pred_q = tf.reduce_sum(tf.multiply(self.prediction_Q, action_one_hot), reduction_indices=1)
 
-        loss = tf.reduce_mean(tf.square(pred_q - target_q))
+        loss = tf.reduce_mean(tf.losses.huber_loss(target_q, pred_q))
+        #loss = tf.reduce_mean(tf.square(pred_q - target_q))
         dqn_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='dqn/pred')
         optimizer = tf.train.AdamOptimizer(learning_rate=self.args.learning_rate).minimize(loss, var_list=dqn_var)
 

@@ -27,6 +27,8 @@ class Agent(object):
 
         self.dqn.update_target_network()
 
+        self.prev_q = 0
+
     #def process_state(self, next_state):
         #self.state = next_state
 
@@ -80,6 +82,18 @@ class Agent(object):
         if load:
             if not self.load():
                 exit()
+        
+        self.tr_vrbs = tf.trainable_variables()
+        for i in self.tr_vrbs:
+            if "dqn/pred" in i.op.name:
+                print(i.op.name)
+                print(i.shape)
+                weights = self.sess.run(i)
+                print(np.sum(weights))
+                #for j in weights:
+                    #print(np.sum(j))
+
+
         best_reward = 0
         for episode in range(num_episode):
             self.reset_episode()
@@ -88,6 +102,7 @@ class Agent(object):
             terminal = False
             while not terminal:
                 action = self.select_action()
+                #action = self.env.random_action()
                 next_state, reward, terminal = self.env.act(action)
                 #self.process_state(next_state)
 
@@ -112,10 +127,29 @@ class Agent(object):
             #print('\nRandom action %d' % action)
         else:
             #print(self.env.value_matrix.shape)
-            q = self.dqn.predict_Q_value(np.squeeze(self.env.value_matrix))[0]
-            action = np.argmax(q)
+          
+            try:
+                self.prev_q = self.q
+            except:
+                self.prev_q = 0
+
+            '''
+            if q in locals():
+                self.prev_q = q
+            else:
+                self.prev_q = 0
+            '''
+            shape = self.env.state_shape
+
+            self.q = self.dqn.predict_Q_value(np.squeeze(np.random.rand(shape[0], shape[1])))[0]
+            #self.q = self.dqn.predict_Q_value(np.squeeze(self.env.value_matrix))[0]
+            action = np.argmax(self.q)
             val_sum = np.sum(self.env.value_matrix)
-            print('\nQ value %s and action %d sum %f' % (q, action+1, val_sum))
+            q_diff_sum = np.sum(self.q) - np.sum(self.prev_q)
+            #print(val_sum[0])
+            print('\nselected action %d val_sum %f' % (action+1, val_sum))
+            #print('\nQ value %s and action %d sum %f' % (self.q, action+1, val_sum))
+            print('Q diff : %.20f' %q_diff_sum)
         return action 
 
     def write_log(self, episode_count, episode_reward):

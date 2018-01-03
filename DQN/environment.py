@@ -48,13 +48,28 @@ class DKVMNEnvironment(Environment):
         print('NEW EPISODE')
 
         final_values_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
+        final_value_matrix = self.value_matrix
         print('final_values_probs')
 
         self.value_matrix = self.sess.run(self.env.init_memory_value)
         starting_values_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
-
+ 
+        val_matrix_diff = np.sum(final_value_matrix - self.value_matrix) 
+        prob_diff = np.sum(final_values_probs - starting_values_probs)
+        pos_count = 0
+        neg_count = 0
         for i, (s,f) in enumerate(zip(starting_values_probs, final_values_probs)):
             print(i, s, f, f-s)
+            if f>=s:
+                pos_count += 1
+            else:
+                neg_count +=1
+
+        log_file_name = 'episode_log.txt'
+        log_file = open(log_file_name, 'a')
+        log = 'Pos %d, neg %d, prob_diff %f, val_diff %f \n' % (pos_count, neg_count, prob_diff, val_matrix_diff)  
+        log_file.write(log)
+        log_file.flush()
 
     def check_terminal(self, total_pred_probs):
         return False
@@ -96,7 +111,7 @@ class DKVMNEnvironment(Environment):
         self.episode_step += 1
 
         # For scaling
-        self.reward = self.reward/100
+        #self.reward = self.reward/100
         
         total_pred_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
         print('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))

@@ -437,7 +437,7 @@ class DKVMNModel():
         self.pred_prob_difference = tf.squeeze(tf.reduce_sum(self.stepped_pred_prob - prev_pred_prob))
 
     def ideal_test(self):
-        type_list = [0, 1]
+        type_list = [-1]
         for t in type_list: 
             self.ideal_test_given_type(t) 
     
@@ -465,13 +465,14 @@ class DKVMNModel():
                 q = np.expand_dims(np.expand_dims(q_idx, axis=0), axis=0) 
                 a = np.expand_dims(np.expand_dims(input_type, axis=0), axis=0) 
         
-                ops = [self.stepped_value_matrix, self.stepped_pred_prob, self.value_matrix_difference, self.read_content_difference, self.summary_difference, self.pred_logit_difference, self.pred_prob_difference]
+                ops = [self.stepped_value_matrix, self.stepped_pred_prob, self.value_matrix_difference, self.read_content_difference, self.summary_difference, self.pred_logit_difference, self.pred_prob_difference, self.qa]
                 feed_dict = { self.q : q, self.a : a, self.value_matrix: value_matrix }
 
-                value_matrix, pred_prob, value_matrix_diff, read_content_diff, summary_diff, pred_logit_diff, pred_prob_diff = np.squeeze(self.sess.run(ops, feed_dict=feed_dict))
+                value_matrix, pred_prob, value_matrix_diff, read_content_diff, summary_diff, pred_logit_diff, pred_prob_diff, qa = np.squeeze(self.sess.run(ops, feed_dict=feed_dict))
+                a = (qa-1) // self.args.n_questions
                 pred_prob = np.squeeze(np.squeeze(pred_prob))
 
-                log = str(i)+','+ str(q_idx) +','+str(input_type)+','+str(np.sum(value_matrix))+','+str(pred_prob) + ','
+                log = str(i)+','+ str(q_idx) +','+str(a)+','+str(np.sum(value_matrix))+','+str(pred_prob) + ','
                 log = log + str(value_matrix_diff) + ','  + str(read_content_diff) + ',' + str(summary_diff) + ',' + str(pred_logit_diff) + ',' + str(pred_prob_diff) + '\n'  
                 log_file.write(log) 
 
