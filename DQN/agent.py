@@ -141,8 +141,8 @@ class Agent(object):
             '''
             shape = self.env.state_shape
 
-            self.q = self.dqn.predict_Q_value(np.squeeze(np.random.rand(shape[0], shape[1])))[0]
-            #self.q = self.dqn.predict_Q_value(np.squeeze(self.env.value_matrix))[0]
+            #self.q = self.dqn.predict_Q_value(np.squeeze(np.random.rand(shape[0], shape[1])))[0]
+            self.q = self.dqn.predict_Q_value(np.squeeze(self.env.state))[0]
             action = np.argmax(self.q)
             val_sum = np.sum(self.env.value_matrix)
             q_diff_sum = np.sum(self.q) - np.sum(self.prev_q)

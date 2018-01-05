@@ -136,7 +136,8 @@ def main():
         parser.add_argument('--dqn_checkpoint_dir', type=str, default='DQN/checkpoint')
         parser.add_argument('--dqn_log_dir', type=str, default='DQN/log')
 
-        parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob'], default='value')
+        parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='value')
+        parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='value')
 
         myArgs = parser.parse_args()
         setHyperParamsForDataset(myArgs)
