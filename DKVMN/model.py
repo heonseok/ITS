@@ -19,6 +19,7 @@ class DKVMNModel():
 
         self.init_model()
         self.init_total_prediction_probability()
+        self.init_mastery_level()
 
     def inference(self, q_embed, correlation_weight, value_matrix, reuse_flag):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
@@ -435,6 +436,66 @@ class DKVMNModel():
         self.summary_difference = tf.squeeze(tf.reduce_sum(self.stepped_summary - prev_summary))
         self.pred_logit_difference = tf.squeeze(tf.reduce_sum(self.stepped_pred_logits - prev_pred_logits))
         self.pred_prob_difference = tf.squeeze(tf.reduce_sum(self.stepped_pred_prob - prev_pred_prob))
+
+    def init_mastery_level(self):
+        self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
+        #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
+
+        one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
+        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(self.mastery_value_matrix, 0), tf.stack([self.args.memory_size, 1, 1]))
+
+        read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
+        print('READ content shape')
+        print(read_content.shape)
+        zero_q_embed = tf.zeros(shape=[self.args.memory_size,50]) 
+        mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 1)
+        print('Mastery level prior difficulty')
+        print(mastery_level_prior_difficulty.shape)
+
+        # f_t
+        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=True)
+        if self.args.summary_activation == 'tanh':
+            summary_vector = tf.tanh(summary_logit)
+        elif self.args.summary_activation == 'sigmoid':
+            summary_vector = tf.sigmoid(summary_logit)
+        elif self.args.summary_activation == 'relu':
+            summary_vector = tf.nn.relu(summary_logit)
+
+        # p_t
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=True)
+
+        self.concept_mastery_level = tf.sigmoid(pred_logits)
+
+    '''
+    def init_mastery_level(self):
+        self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
+        self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
+
+        one_hot_correlation_weight = tf.one_hot(self.target_concept_index, self.args.memory_size)
+        read_content = self.memory.value.read(self.mastery_value_matrix, one_hot_correlation_weight)
+        print('READ content shape')
+        print(read_content.shape)
+        zero_q_embed = tf.zeros(shape=[1,50]) 
+        mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 1)
+        print('Mastery level prior difficulty')
+        print(mastery_level_prior_difficulty.shape)
+
+        # f_t
+        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=True)
+        if self.args.summary_activation == 'tanh':
+            summary_vector = tf.tanh(summary_logit)
+        elif self.args.summary_activation == 'sigmoid':
+            summary_vector = tf.sigmoid(summary_logit)
+        elif self.args.summary_activation == 'relu':
+            summary_vector = tf.nn.relu(summary_logit)
+
+        # p_t
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=True)
+
+        self.concept_mastery_level = tf.sigmoid(pred_logits)
+    '''
+
+        
 
     def ideal_test(self):
         type_list = [-1]

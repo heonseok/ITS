@@ -90,8 +90,6 @@ class DKVMNEnvironment(Environment):
         answer = np.asarray(-1, dtype=np.int32)
         answer = np.expand_dims(np.expand_dims(answer, axis=0), axis=0)
 
-        #prev_value_matrix = self.value_matrix
-
         ops = [self.env.stepped_value_matrix, self.env.value_matrix_difference, self.env.read_content_difference, self.env.summary_difference, self.env.qa, self.env.stepped_pred_prob, self.env.pred_prob_difference]
         self.value_matrix, val_diff, read_diff, summary_diff, qa, stepped_prob, prob_diff = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})
         
@@ -113,6 +111,18 @@ class DKVMNEnvironment(Environment):
         # For scaling
         #self.reward = self.reward/100
         
+        ########## Concept mastery level ##############
+        mastery_level = self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix})
+        print(mastery_level)
+        '''
+        for i in range(0,20):
+            mastery_level = self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix, self.env.target_concept_index: i})
+            print(i)
+            print(mastery_level[0])
+            print('Concept %d mastery level: %d' %(i,mastery_level[0]))
+        '''
+
+
         total_pred_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
         print('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
         if self.episode_step == self.args.episode_maxstep:
