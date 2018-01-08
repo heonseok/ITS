@@ -28,11 +28,12 @@ class SimpleEnvironment(Environment):
         return self.env.action_space.sample()
 
 class DKVMNEnvironment(Environment):
-    def __init__(self, args, sess, dkvmn):
+    def __init__(self, args, sess, dkvmn, logger):
         super(DKVMNEnvironment, self).__init__(args)
 
+        self.logger = logger 
         self.sess = sess
-        print('Initializing ENVIRONMENT')
+        self.logger.info('Initializing ENVIRONMENT')
         self.env = dkvmn 
 
         self.num_actions = self.args.n_questions
@@ -51,52 +52,105 @@ class DKVMNEnvironment(Environment):
             self.state_shape = [self.args.memory_size] 
             self.state = mastery_level 
 
-        print('state shape')
-        print(self.state_shape)
+        self.answer_checker = np.zeros(self.num_actions)
 
     def new_episode(self):
-        print('NEW EPISODE')
+
+        #self.logger.info('ANSWER log')
+        #self.logger.info(self.answer_checker)
         
         final_mastery_level = self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix})[0]
 
         final_values_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
         final_value_matrix = self.value_matrix
 
+        ##### init variables #####
         self.value_matrix = self.sess.run(self.env.init_memory_value)
+        self.answer_checker = np.zeros(self.num_actions)
+
         starting_values_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
         starting_mastery_level = self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix})[0]
  
-        print('final_mastery_level')
-        for i, (s,f) in enumerate(zip(starting_mastery_level, final_mastery_level)):
-            print(i, s, f, f-s)
 
+        ###### count pos/neg #####
+        mastery_level_diff = final_mastery_level - starting_mastery_level
+        mastery_pos = np.sum(mastery_level_diff >= 0)
+        mastery_neg = np.sum(mastery_level_diff < 0)
+
+        prob_diff = final_values_probs - starting_values_probs
+        prob_pos = np.sum(prob_diff >= 0)
+        prob_neg = np.sum(prob_diff < 0)
+
+        mastery_count_log = 'p: %d, n: %d' % (mastery_pos, mastery_neg)
+        prob_count_log = 'p: %d, n: %d' % (prob_pos, prob_neg)
+
+        ###### caculate average #####
+        starting_mastery_level_avg = np.average(starting_mastery_level)
+        final_mastery_level_avg = np.average(final_mastery_level)
+        mastery_log = 'Mastery f: %.4f, d: %.4f' % (final_mastery_level_avg, final_mastery_level_avg - starting_mastery_level_avg)
+        #mastery_log = 'Mastery s: %.4f, f: %.4f, d: %.4f' % (starting_mastery_level_avg, final_mastery_level_avg, final_mastery_level_avg - starting_mastery_level_avg)
+
+        starting_prob_avg = np.average(starting_values_probs)
+        final_prob_avg = np.average(final_values_probs)
+        prob_log = 'Prob f: %.4f, d: %.4f' % (final_prob_avg, final_prob_avg - starting_prob_avg)
+        #prob_log = 'Prob s: %.4f, f: %.4f, d: %.4f' % (starting_prob_avg, final_prob_avg, final_prob_avg - starting_prob_avg)
+
+       
+        ##### logging #####
+        self.logger.info('NEW EPISODE ANWER: %d %s %s %s %s' % (np.sum(self.answer_checker), mastery_log, mastery_count_log, prob_log, prob_count_log))
+        
+
+        '''
         val_matrix_diff = np.sum(final_value_matrix - self.value_matrix) 
         prob_diff = np.sum(final_values_probs - starting_values_probs)
         pos_count = 0
         neg_count = 0
-        print('final_values_probs')
+
+        #self.logger.info('final_values_probs')
+        '''
+
+        '''
+        #self.logger.info('final_mastery_level')
+        #for i, (s,f) in enumerate(zip(starting_mastery_level, final_mastery_level)):
+            #self.logger.info('%f %f %f %f' %(i, s, f, f-s))
+
         for i, (s,f) in enumerate(zip(starting_values_probs, final_values_probs)):
-            print(i, s, f, f-s)
+            #self.logger.info('%f %f %f %f' % (i, s, f, f-s))
             if f>=s:
                 pos_count += 1
             else:
                 neg_count +=1
-
-
+                '''
+        '''
         log_file_name = 'episode_log.txt'
         log_file = open(log_file_name, 'a')
         log = 'Pos %d, neg %d, prob_diff %f, val_diff %f \n' % (pos_count, neg_count, prob_diff, val_matrix_diff)  
         log_file.write(log)
         log_file.flush()
+        '''
 
     def check_terminal(self, total_pred_probs):
-        return False
+        total_preds = total_pred_probs >= 0.9
+        mask = np.squeeze(total_preds) * self.answer_checker
+
+        if np.prod(mask) == 1:
+            return True
+        else: 
+            return False
 
     def baseline_act(self):
         total_preds = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
         best_prob_index = np.argmax(total_preds)
         print('Action:%d, prob:%3.4f' % (best_prob_index+1, total_preds[best_prob_index]))
         return best_prob_index+1, total_preds[best_prob_index]
+
+
+    def mask_actions(self, q_values):
+        total_preds = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
+        total_preds = total_preds >= 0.9
+        mask = np.squeeze(total_preds) * self.answer_checker
+
+        return (1-mask) * q_values
 
     def act(self, action):
         action = np.asarray(action+1, dtype=np.int32)
@@ -113,9 +167,14 @@ class DKVMNEnvironment(Environment):
         ops = [self.env.stepped_value_matrix, self.env.value_matrix_difference, self.env.read_content_difference, self.env.summary_difference, self.env.qa, self.env.stepped_pred_prob, self.env.pred_prob_difference]
         self.value_matrix, val_diff, read_diff, summary_diff, qa, stepped_prob, prob_diff = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})
         mastery_level = self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix})
-        #print(mastery_level)
-        #print(mastery_level[0])
-        #print(mastery_level[0][0])
+ 
+        if qa > self.num_actions:
+            a = qa - self.num_actions
+            self.answer_checker[a-1] = 1 
+        else:
+            a = qa 
+            self.answer_checker[a-1] = 0 
+
 
         if self.args.reward_type == 'value':
             self.reward = np.sum(val_diff) 
@@ -153,9 +212,9 @@ class DKVMNEnvironment(Environment):
             print('Concept %d mastery level: %d' %(i,mastery_level[0]))
         '''
 
-
         total_pred_probs = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
-        print('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
+        self.logger.debug('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
+
         if self.episode_step == self.args.episode_maxstep:
             terminal = True
         elif self.check_terminal(total_pred_probs) == True:
@@ -163,7 +222,7 @@ class DKVMNEnvironment(Environment):
         else:
             terminal = False
 
-        return np.squeeze(self.state), self.reward, terminal
+        return np.squeeze(self.state), self.reward, terminal, mastery_level
 
     def random_action(self):
         return random.randrange(0, self.num_actions)

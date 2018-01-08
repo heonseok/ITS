@@ -9,19 +9,41 @@ from dqn import *
 from environment import *
 from replay_memory import *
 
-class Agent(object):
-    def __init__(self, args, sess):
+import logging 
+
+class DKVMNAgent():
+    def __init__(self, args, sess, dkvmn):
+
         self.args = args
         self.sess = sess
+
+        self.logger = logging.getLogger('DQN')
+        
+        self.logger.setLevel(eval('logging.%s'%self.args.logging_level))
+
+        ch = logging.StreamHandler()
+        formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] [%(message)s]')
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+
+        self.logger.info('Initializing AGENT')
+
+        self.env = DKVMNEnvironment(args, sess, dkvmn, self.logger)
+        self.memory = DKVMNMemory(args, self.env.state_shape)
+        #super(DKVMNAgent, self).__init__(args, sess)
+        dkvmn.load()
+
         self.dqn = DQN(self.args, self.sess, self.memory, self.env)
 
         self.saver = tf.train.Saver()
-        self.logger = Logger(os.path.join(self.args.dqn_log_dir, self.model_dir))
+        self.tb_logger = Logger(os.path.join(self.args.dqn_log_dir, self.model_dir))
 
-        print('Trainalbe_variables of DKVMNAgent')
+        '''
+        self.logger.info('Trainalbe_variables of DKVMNAgent')
         for i in tf.trainable_variables():
             if "dkvmn" not in i.op.name:
                 print(i.op.name)
+        '''
 
         self.sess.run(tf.global_variables_initializer())
 
@@ -33,19 +55,23 @@ class Agent(object):
         #self.state = next_state
 
     def train(self):
-        print('Agent is training')
+        self.logger.info('Agent is training')
         self.episode_count = 0
         best_reward = 0
         self.episode_reward = 0
+        action_count = 0 
         episode_rewards = []
 
-        print('===== Start to make random memory =====')
+        self.logger.info('===== Start to make random memory =====')
         self.reset_episode()
         for self.step in tqdm(range(1, self.args.max_step+1), ncols=70, initial=0):
             action = self.select_action()
+            action_count += 1
 
-            next_state, reward, terminal = self.env.act(action)
+            next_state, reward, terminal, mastery_lelvel = self.env.act(action)
             self.memory.add(action, reward, terminal, next_state)
+
+            #self.tb_logger.log_scalar(tag='Episode%d:action'%self.episode_count, value=action, step=action_count)
             
             self.episode_reward += reward 
             if terminal:
@@ -53,12 +79,13 @@ class Agent(object):
                 episode_rewards.append(self.episode_reward)
                 if self.episode_reward > best_reward:
                     best_reward = self.episode_reward
-                self.logger.log_scalar(tag='reward', value=self.episode_reward, step=self.step)
+                #self.tb_logger.log_scalar(tag='reward', value=self.episode_reward, step=self.step)
                 self.reset_episode()
+                action_count = 0
 
             if self.step >= self.args.training_start_step:
                 if self.step == self.args.training_start_step:
-                    print("===== Start to update the network =====")
+                    self.logger.info("===== Start to update the network =====")
 
                 if self.step % self.args.train_interval == 0:
                     loss, _ = self.dqn.train_network()
@@ -75,7 +102,7 @@ class Agent(object):
                     min_r = np.min(episode_rewards)
                     if max_r > best_reward:
                         best_reward = max_r
-                    print('\n[recent %d episodes] avg_r: %.4f, max_r: %d, min_r: %d // Best: %d' % (len(episode_rewards), avg_r, max_r, min_r, best_reward))
+                    self.logger.debug('\n[recent %d episodes] avg_r: %.4f, max_r: %d, min_r: %d // Best: %d' % (len(episode_rewards), avg_r, max_r, min_r, best_reward))
                     episode_rewards = []
 
     def play(self, num_episode=10, load=True):
@@ -83,6 +110,7 @@ class Agent(object):
             if not self.load():
                 exit()
         
+        '''
         self.tr_vrbs = tf.trainable_variables()
         for i in self.tr_vrbs:
             if "dqn/pred" in i.op.name:
@@ -92,9 +120,11 @@ class Agent(object):
                 print(np.sum(weights))
                 #for j in weights:
                     #print(np.sum(j))
-
+        '''
 
         best_reward = 0
+        action_count = 0
+
         for episode in range(num_episode):
             self.reset_episode()
             current_reward = 0
@@ -102,8 +132,12 @@ class Agent(object):
             terminal = False
             while not terminal:
                 action = self.select_action()
+                action_count += 1
+                self.tb_logger.log_scalar(tag='Episode%d:action'%episode, value=action, step=action_count)
                 #action = self.env.random_action()
-                next_state, reward, terminal = self.env.act(action)
+                next_state, reward, terminal, mastery_level = self.env.act(action)
+                self.tb_logger.log_scalar(tag='Episode%d:reward'%episode, value=reward, step=action_count)
+                #self.tb_logger.log_histogram(tag='Episode%d:mastery_level'%episode, values=np.squeeze(mastery_level), step=action_count)
                 #self.process_state(next_state)
 
                 current_reward += reward
@@ -112,9 +146,8 @@ class Agent(object):
 
             if current_reward > best_reward:
                 best_reward = current_reward
-            print('<%d> Current episode reward: %f' % (episode, current_reward))
-            print('='*30)
-            print('Best episode reward : %f' % (best_reward))
+            self.logger.info('<%d> Current episode reward: %f' % (episode, current_reward))
+            self.logger.info('Best episode reward : %f' % (best_reward))
 
     def select_action(self):
         if self.args.dqn_train:
@@ -143,13 +176,18 @@ class Agent(object):
 
             #self.q = self.dqn.predict_Q_value(np.squeeze(np.random.rand(shape[0], shape[1])))[0]
             self.q = self.dqn.predict_Q_value(np.squeeze(self.env.state))[0]
+
+            ## Msking problems for higher than 0.9
+            self.q = self.env.mask_actions(self.q)
+            #print(self.q.shape)
+
             action = np.argmax(self.q)
             val_sum = np.sum(self.env.value_matrix)
             q_diff_sum = np.sum(self.q) - np.sum(self.prev_q)
             #print(val_sum[0])
-            print('\nselected action %d val_sum %f' % (action+1, val_sum))
+            #print('\nselected action %d val_sum %f' % (action+1, val_sum))
             #print('\nQ value %s and action %d sum %f' % (self.q, action+1, val_sum))
-            print('Q diff : %.20f' %q_diff_sum)
+            #print('Q diff : %.20f' %q_diff_sum)
         return action 
 
     def write_log(self, episode_count, episode_reward):
@@ -170,42 +208,20 @@ class Agent(object):
         if not os.path.exists(checkpoint_dir):
             os.mkdir(checkpoint_dir)
         self.saver.save(self.sess, os.path.join(checkpoint_dir, str(self.step)))
-        print('*** Save at %d steps' % self.step)
+        self.logger.info('*** Save at %d steps' % self.step)
 
     def load(self):
-        print('Loading checkpoint ...')
+        self.logger.info('Loading DQN checkpoint ...')
         checkpoint_dir = os.path.join(self.args.dqn_checkpoint_dir, self.model_dir)
         checkpoint_state = tf.train.get_checkpoint_state(checkpoint_dir)
         if checkpoint_state and checkpoint_state.model_checkpoint_path:
             checkpoint_model = os.path.basename(checkpoint_state.model_checkpoint_path)
             self.saver.restore(self.sess, checkpoint_state.model_checkpoint_path)
-            print('Success to laod %s' % checkpoint_model)
+            self.logger.info('Success to load %s' % checkpoint_model)
             return True
         else:
-            print('Faile to find a checkpoint')
+            self.logger.info('Faile to find a checkpoint')
             return False
-
-class SimpleAgent(Agent):
-    def __init__(self, args, sess):
-        self.env = SimpleEnvironment(args)
-        self.memory = SimpleMemory(args, self.env.state_shape)
-        super(SimpleAgent, self).__init__(args, sess)
-
-    def reset_episode(self):
-        self.state = self.env.new_episode()
-
-    #def process_state(self, next_state):
-        #self.state = next_state
-
-
-class DKVMNAgent(Agent):
-    def __init__(self, args, sess, dkvmn):
-        print('Initializing AGENT')
-
-        self.env = DKVMNEnvironment(args, sess, dkvmn)
-        self.memory = DKVMNMemory(args, self.env.state_shape)
-        super(DKVMNAgent, self).__init__(args, sess)
-        dkvmn.load()
 
     def reset_episode(self):
         self.env.new_episode()

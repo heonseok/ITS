@@ -139,6 +139,9 @@ def main():
         parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='value')
         parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='value')
 
+        parser.add_argument('--logging_level', type=str, choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'], default='INFO')
+
+
         myArgs = parser.parse_args()
         setHyperParamsForDataset(myArgs)
         print('Batch_Size : %d' % myArgs.batch_size)

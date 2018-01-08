@@ -331,8 +331,8 @@ class DKVMNModel():
         else:
             raise Exception('CKPT need')
 
-        print('Initial value of probability')
-        print(init_probability)
+        #print('Initial value of probability')
+        #print(init_probability)
 
         pred_list = list()
         target_list = list()
@@ -403,7 +403,7 @@ class DKVMNModel():
         # value_matrix : state for RL
         self.q = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_q') 
         self.a = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_a') 
-        self.value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='step_value_matrix')
+        self.value_matrix = tf.placeholder(tf.float32, [self.args.memory_size, self.args.memory_value_state_dim], name='step_value_matrix')
 
         slice_a = tf.split(self.a, self.args.seq_len, 1) 
         a = tf.squeeze(slice_a[0], 1)
@@ -447,7 +447,7 @@ class DKVMNModel():
         read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
         print('READ content shape')
         print(read_content.shape)
-        zero_q_embed = tf.zeros(shape=[self.args.memory_size,50]) 
+        zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions]) 
         mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 1)
         print('Mastery level prior difficulty')
         print(mastery_level_prior_difficulty.shape)

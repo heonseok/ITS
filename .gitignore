@@ -5,4 +5,5 @@ DKVMN/*.swp
 DKVMN/logs
 DKVMN/__pycache__
 DKVMN/checkpoint
+DKVMN/100epoch_checkpoint
 toy.py

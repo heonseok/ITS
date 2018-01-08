@@ -12,8 +12,6 @@ class DQN(object):
         self.env = environment
         self.num_actions = self.env.num_actions
         self.input_shape = self.memory.state_shape
-        print('input shape')
-        print(self.input_shape)
 
 
         self.kernel_initializer = tf.truncated_normal_initializer(mean=0.0, stddev=0.02)
@@ -39,7 +37,7 @@ class DQN(object):
 
     def build_network(self, name):
         with tf.variable_scope(name):
-            fc1 = tf.layers.dense(inputs=tf.reshape(self.states, (-1, np.prod(self.input_shape))), units=512, activation=tf.nn.sigmoid, kernel_initializer=self.kernel_initializer)
+            fc1 = tf.layers.dense(inputs=tf.reshape(self.states, (-1, np.prod(self.input_shape))), units=32, activation=tf.nn.sigmoid, kernel_initializer=self.kernel_initializer)
             #fc2 = tf.layers.dense(inputs=fc1, units=128, activation=tf.nn.sigmoid, kernel_initializer=self.kernel_initializer)
             Q = tf.layers.dense(inputs=fc1, units=self.num_actions, activation=None, kernel_initializer=self.kernel_initializer)
             return Q
@@ -60,16 +58,8 @@ class DQN(object):
         
     def update_target_network(self):
         self.sess.run(self.copy_op)
-        print('Copy is done')
 
     def predict_Q_value(self, state):
-        '''
-        print('State')
-        print(state)
-        print(state.shape)
-        print([state])
-        '''
-        #return self.sess.run(self.prediction_Q, feed_dict={self.states: state})
         return self.sess.run(self.prediction_Q, feed_dict={self.states: [state]})
 
     def train_network(self):
