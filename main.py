@@ -113,7 +113,6 @@ def main():
 
 
         ########## DQN ##########
-        parser.add_argument('--env_name', type=str, choices=['CartPole-v0', 'DKVMN'], default='DKVMN')
         parser.add_argument('--batch_size_dqn', type=int, default=32)
         parser.add_argument('--max_step', type=int, default=50000)
         parser.add_argument('--max_exploration_step', type=int, default=50000)
@@ -123,7 +122,7 @@ def main():
         parser.add_argument('--discount_factor', type=float, default=0.95)
         parser.add_argument('--eps_init', type=float, default=1.0)
         parser.add_argument('--eps_min', type=float, default=0.1)
-        parser.add_argument('--eps_test', type=float, default=0.05)
+        parser.add_argument('--eps_test', type=float, default=-1)
 
         parser.add_argument('--training_start_step', type=int, default=100)
         parser.add_argument('--train_interval', type=int, default=1)
@@ -134,10 +133,13 @@ def main():
         parser.add_argument('--learning_rate', type=float, default=0.01)
 
         parser.add_argument('--dqn_checkpoint_dir', type=str, default='DQN/checkpoint')
-        parser.add_argument('--dqn_log_dir', type=str, default='DQN/log')
+        parser.add_argument('--dqn_tb_log_dir', type=str, default='DQN/tb_log')
 
         parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='value')
         parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='value')
+        parser.add_argument('--test_policy_type', type=str, choices=['random', 'dqn'], default='dqn')
+
+        parser.add_argument('--num_test_episode', type=int, default=100)
 
         parser.add_argument('--logging_level', type=str, choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'], default='INFO')
 
@@ -147,22 +149,21 @@ def main():
         print('Batch_Size : %d' % myArgs.batch_size)
 
         ### check dkvmn dir ###
-        if not os.path.exists(myArgs.dkvmn_checkpoint_dir): os.makedirs(myArgs.dkvmn_checkpoint_dir)
+        if not os.path.exists(myArgs.dkvmn_checkpoint_dir): 
+            os.makedirs(myArgs.dkvmn_checkpoint_dir)
         if not os.path.exists(myArgs.dkvmn_log_dir):
             os.makedirs(myArgs.dkvmn_log_dir)
 
         data = DATA_LOADER(myArgs.n_questions, myArgs.seq_len, ',')
-        #print(myArgs.seq_len)
         data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)
 
         ### check dqn dir ###
         if not os.path.exists(myArgs.dqn_checkpoint_dir):
             os.makedirs(myArgs.dqn_checkpoint_dir)
-        if not os.path.exists(myArgs.dqn_log_dir):
-            os.makedirs(myArgs.dqn_log_dir)
+        if not os.path.exists(myArgs.dqn_tb_log_dir):
+            os.makedirs(myArgs.dqn_tb_log_dir)
 
         os.environ["CUDA_VISIBLE_DEVICES"] = myArgs.gpu_id 
-        #os.environ["CUDA_VISIBLE_DEVICES"] = '0'
         run_config = tf.ConfigProto()
         #run_config.log_device_placement = True
         run_config.gpu_options.allow_growth = True

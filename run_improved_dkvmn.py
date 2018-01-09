@@ -27,7 +27,7 @@ for knowledge_growth in knowledge_growth_list:
                     for learning_rate in learning_rate_list:
 
                         args_list = []
-                        args_list.append('python main.py --dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train f --dqn_test t --gpu_id 1 --state_type mastery --reward_type mastery --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
+                        args_list.append('python main.py --dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train f --dqn_test t --gpu_id 1 --state_type mastery --reward_type mastery --test_policy_type dqn --logging_level INFO --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
 
                         args_list.append('--dataset synthetic')
 

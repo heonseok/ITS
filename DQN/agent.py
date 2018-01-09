@@ -31,12 +31,11 @@ class DKVMNAgent():
         self.env = DKVMNEnvironment(args, sess, dkvmn, self.logger)
         self.memory = DKVMNMemory(args, self.env.state_shape)
         #super(DKVMNAgent, self).__init__(args, sess)
-        dkvmn.load()
 
         self.dqn = DQN(self.args, self.sess, self.memory, self.env)
 
         self.saver = tf.train.Saver()
-        self.tb_logger = Logger(os.path.join(self.args.dqn_log_dir, self.model_dir))
+        self.tb_logger = Logger(os.path.join(self.args.dqn_tb_log_dir, self.model_dir))
 
         '''
         self.logger.info('Trainalbe_variables of DKVMNAgent')
@@ -46,6 +45,7 @@ class DKVMNAgent():
         '''
 
         self.sess.run(tf.global_variables_initializer())
+        dkvmn.load()
 
         self.dqn.update_target_network()
 
@@ -75,6 +75,7 @@ class DKVMNAgent():
             
             self.episode_reward += reward 
             if terminal:
+                print('Terminal at %dth action' % action_count)
                 self.episode_count += 1
                 episode_rewards.append(self.episode_reward)
                 if self.episode_reward > best_reward:
@@ -104,8 +105,10 @@ class DKVMNAgent():
                         best_reward = max_r
                     self.logger.debug('\n[recent %d episodes] avg_r: %.4f, max_r: %d, min_r: %d // Best: %d' % (len(episode_rewards), avg_r, max_r, min_r, best_reward))
                     episode_rewards = []
+    
 
-    def play(self, num_episode=10, load=True):
+
+    def play(self, load=True):
         if load:
             if not self.load():
                 exit()
@@ -124,9 +127,10 @@ class DKVMNAgent():
 
         best_reward = 0
         action_count = 0
-
-        for episode in range(num_episode):
-            self.reset_episode()
+        action_count_list = [] 
+    
+        self.reset_episode()
+        for episode in range(self.args.num_test_episode):
             current_reward = 0
 
             terminal = False
@@ -134,20 +138,26 @@ class DKVMNAgent():
                 action = self.select_action()
                 action_count += 1
                 self.tb_logger.log_scalar(tag='Episode%d:action'%episode, value=action, step=action_count)
-                #action = self.env.random_action()
                 next_state, reward, terminal, mastery_level = self.env.act(action)
                 self.tb_logger.log_scalar(tag='Episode%d:reward'%episode, value=reward, step=action_count)
-                #self.tb_logger.log_histogram(tag='Episode%d:mastery_level'%episode, values=np.squeeze(mastery_level), step=action_count)
-                #self.process_state(next_state)
 
                 current_reward += reward
                 if terminal:
+                    action_count_list.append(action_count)
+                    self.reset_episode()
+                    action_count = 0
                     break
 
             if current_reward > best_reward:
                 best_reward = current_reward
+
             self.logger.info('<%d> Current episode reward: %f' % (episode, current_reward))
-            self.logger.info('Best episode reward : %f' % (best_reward))
+            self.logger.info('Best episode reward: %f' % (best_reward))
+
+        print(action_count_list) 
+        action_count_avg = np.average(np.array(action_count_list))
+        #action_count_avg = np.average(np.concatenate(action_count_list, axis=0))
+        self.logger.info('Average number of actions: %f' % action_count_avg)
 
     def select_action(self):
         if self.args.dqn_train:
@@ -155,16 +165,16 @@ class DKVMNAgent():
         elif self.args.dqn_test:
             self.eps = self.args.eps_test
 
-        if np.random.rand() < self.eps:
+        if self.args.test_policy_type == 'random' or np.random.rand() < self.eps:
             action = self.env.random_action()
             #print('\nRandom action %d' % action)
-        else:
-            #print(self.env.value_matrix.shape)
-          
+        elif self.args.test_policy_type == 'dqn':
+            '''
             try:
                 self.prev_q = self.q
             except:
                 self.prev_q = 0
+            '''
 
             '''
             if q in locals():
@@ -172,7 +182,7 @@ class DKVMNAgent():
             else:
                 self.prev_q = 0
             '''
-            shape = self.env.state_shape
+            #shape = self.env.state_shape
 
             #self.q = self.dqn.predict_Q_value(np.squeeze(np.random.rand(shape[0], shape[1])))[0]
             self.q = self.dqn.predict_Q_value(np.squeeze(self.env.state))[0]
@@ -182,8 +192,9 @@ class DKVMNAgent():
             #print(self.q.shape)
 
             action = np.argmax(self.q)
-            val_sum = np.sum(self.env.value_matrix)
-            q_diff_sum = np.sum(self.q) - np.sum(self.prev_q)
+            
+            #val_sum = np.sum(self.env.value_matrix)
+            #q_diff_sum = np.sum(self.q) - np.sum(self.prev_q)
             #print(val_sum[0])
             #print('\nselected action %d val_sum %f' % (action+1, val_sum))
             #print('\nQ value %s and action %d sum %f' % (self.q, action+1, val_sum))
@@ -200,7 +211,8 @@ class DKVMNAgent():
         
     @property
     def model_dir(self):
-        return '{}_{}batch'.format(self.args.env_name, self.args.batch_size_dqn)
+        return '{}_State_{}_Reward_{}'.format(self.env.env.model_dir, self.args.state_type, self.args.reward_type)
+        #return '{}_{}batch'.format(self.args.env_name, self.args.batch_size_dqn)
             
             
     def save(self):
