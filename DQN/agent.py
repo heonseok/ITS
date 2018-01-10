@@ -22,7 +22,8 @@ class DKVMNAgent():
         self.logger.setLevel(eval('logging.%s'%self.args.logging_level))
 
         ch = logging.StreamHandler()
-        formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] [%(message)s]')
+        formatter = logging.Formatter('[%(levelname)s] %(message)s')
+        #formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] [%(message)s]')
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
 
@@ -151,8 +152,8 @@ class DKVMNAgent():
             if current_reward > best_reward:
                 best_reward = current_reward
 
-            self.logger.info('<%d> Current episode reward: %f' % (episode, current_reward))
-            self.logger.info('Best episode reward: %f' % (best_reward))
+            #self.logger.info('<%d> Current episode reward: %f' % (episode, current_reward))
+            #self.logger.info('Best episode reward: %f' % (best_reward))
 
         print(action_count_list) 
         action_count_avg = np.average(np.array(action_count_list))

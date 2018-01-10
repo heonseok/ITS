@@ -143,10 +143,14 @@ def main():
 
         parser.add_argument('--logging_level', type=str, choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'], default='INFO')
 
+        parser.add_argument('--terminal_condition', type=str, choices=['prob, mastery'], default='prob')
+        parser.add_argument('--terminal_threshold', type=float, default=0.9)
 
         myArgs = parser.parse_args()
         setHyperParamsForDataset(myArgs)
-        print('Batch_Size : %d' % myArgs.batch_size)
+
+        if myArgs.test_policy_type != 'dqn':
+            myArgs.dqn_train = 'f'
 
         ### check dkvmn dir ###
         if not os.path.exists(myArgs.dkvmn_checkpoint_dir): 
