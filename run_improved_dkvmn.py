@@ -19,9 +19,11 @@ learning_rate_list = [0.6]
 #learning_rate_list = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 # 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
 
-state_type_list = ['value', 'mastery']
+state_type_list = ['mastery']
+#'value', 'mastery'
 
-reward_type_list = ['value', 'read', 'summary', 'prob', 'mastery'] 
+reward_type_list = ['mastery'] 
+#'value', 'read', 'summary', 'prob', 'mastery'
 
 
 for knowledge_growth in knowledge_growth_list:
@@ -33,35 +35,35 @@ for knowledge_growth in knowledge_growth_list:
                         for state_type in state_type_list:
                             for reward_type in reward_type_list:
 
-                        args_list = []
-                        args_list.append('python main.py --dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train t --dqn_test t --gpu_id 1 --test_policy_type dqn --logging_level INFO --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
+                                args_list = []
+                                args_list.append('python main.py --dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train t --dqn_test t --gpu_id 0 --test_policy_type dqn --logging_level INFO --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
 
-                        args_list.append('--dataset synthetic')
+                                args_list.append('--dataset synthetic')
 
-                        args_list.append('--knowledge_growth')
-                        args_list.append(knowledge_growth)
+                                args_list.append('--knowledge_growth')
+                                args_list.append(knowledge_growth)
 
-                        args_list.append('--summary_activation')
-                        args_list.append(summary_activation)
+                                args_list.append('--summary_activation')
+                                args_list.append(summary_activation)
 
-                        args_list.append('--add_signal_activation')
-                        args_list.append(add_signal_activation)
+                                args_list.append('--add_signal_activation')
+                                args_list.append(add_signal_activation)
 
-                        args_list.append('--erase_signal_activation')
-                        args_list.append(erase_signal_activation)
+                                args_list.append('--erase_signal_activation')
+                                args_list.append(erase_signal_activation)
 
-                        args_list.append('--write_type')
-                        args_list.append(write_type)
+                                args_list.append('--write_type')
+                                args_list.append(write_type)
 
-                        args_list.append('--initial_lr')
-                        args_list.append(str(learning_rate))
+                                args_list.append('--initial_lr')
+                                args_list.append(str(learning_rate))
 
-                        args_list.append('--state_type')
-                        args_list.append(state_type)
+                                args_list.append('--state_type')
+                                args_list.append(state_type)
 
-                        args_list.append('--reward_type')
-                        args_list.append(reward_type)
+                                args_list.append('--reward_type')
+                                args_list.append(reward_type)
 
-                        model = ' '.join(args_list)
-                        print(model)
-                        os.system(model)
+                                model = ' '.join(args_list)
+                                print(model)
+                                os.system(model)
