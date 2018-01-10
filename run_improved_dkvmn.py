@@ -42,6 +42,7 @@ for knowledge_growth in knowledge_growth_list:
                                 args_list.append('--gpu_id 0 --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
 
                                 args_list.append('--test_policy_type dqn')
+                                #args_list.append('--test_policy_type prob_max')
                                 args_list.append('--logging_level INFO')
 
                                 args_list.append('--dataset synthetic')

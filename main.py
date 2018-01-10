@@ -47,21 +47,6 @@ def setHyperParamsForDataset(args):
         args.data_name = 'assist2015'
 
 
-    '''
-    if args.dqn_train is True:
-        print('DQN ARG')
-        args.batch_size = 1
-        args.seq_len = 1
-        print(args.batch_size)
-    '''
-       
-
-    '''
-    if args.dkvmn_ideal_test is True:
-        args.batch_size = 1
-        args.seq_len = 1
-    '''
-
 def main():
     try:
         parser = argparse.ArgumentParser()
@@ -76,7 +61,6 @@ def main():
 
         ########## Ideal test for DKVMN
         parser.add_argument('--dkvmn_ideal_test', type=str2bool, default='f')
-        #parser.add_argument('--dkvmn_ideal_test_input_type', type=int, choices=[-1,0,1], default='1')
         
         ########## DKVMN ##########
         parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
@@ -150,7 +134,7 @@ def main():
         setHyperParamsForDataset(myArgs)
 
         if myArgs.test_policy_type != 'dqn':
-            myArgs.dqn_train = 'f'
+            myArgs.dqn_train = False 
 
         ### check dkvmn dir ###
         if not os.path.exists(myArgs.dkvmn_checkpoint_dir): 
@@ -202,20 +186,9 @@ def main():
                 dkvmn.ideal_test()
             
             ##### DQN #####
-            '''
-            if myArgs.env_name == 'CartPole-v0':
-                myAgent = SimpleAgent(myArgs, sess)
-            elif myArgs.env_name == 'DKVMN':
-                sess.run(tf.global_variables_initializer()) 
-          
-                dkvmn.load()
-                myArgs.batch_size = 1
-                myArgs.seq_len = 1
-            '''
             if myArgs.dqn_train or myArgs.dqn_test:
                 sess.run(tf.global_variables_initializer()) 
           
-                #dkvmn.load()
                 myArgs.batch_size = 1
                 myArgs.seq_len = 1
                 myAgent = DKVMNAgent(myArgs, sess, dkvmn)
@@ -230,7 +203,6 @@ def main():
                 myAgent.play()
     
     except KeyboardInterrupt:
-        #myArgs.display
         myArgs.train = False
         myAgent.play(3, False)
         myAgent.save()
