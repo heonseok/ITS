@@ -104,14 +104,22 @@ class DKVMNEnvironment():
 
         self.action_count = 0
         
-    def check_terminal(self, total_pred_probs):
-        total_preds = total_pred_probs >= self.args.terminal_threshold
-        mask = np.squeeze(total_preds) * self.answer_checker
 
+    def get_mask(self):
+        total_preds = self.get_prediction_probability()
+        total_preds = total_preds >= self.args.terminal_threshold
+        return total_preds * self.answer_checker
+
+    def check_terminal(self):
+        mask = self.get_mask()
         if np.prod(mask) == 1:
             return True
         else: 
             return False
+
+    def mask_actions(self, values):
+        mask = self.get_mask()
+        return (1-mask) * values
 
     def baseline_action(self):
         total_preds = self.get_prediction_probability()
@@ -122,14 +130,6 @@ class DKVMNEnvironment():
         elif self.args.test_policy_type == 'prob_min':
             action = np.argmin(total_preds)
         return action 
-
-
-    def mask_actions(self, values):
-        total_preds = self.get_prediction_probability()
-        total_preds = total_preds >= self.args.terminal_threshold
-        mask = np.squeeze(total_preds) * self.answer_checker
-
-        return (1-mask) * values
 
 
     def act(self, action):
@@ -181,12 +181,11 @@ class DKVMNEnvironment():
 
         self.episode_step += 1
 
-        total_pred_probs = self.get_prediction_probability()
         self.logger.debug('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
 
         if self.episode_step == self.args.episode_maxstep:
             terminal = True
-        elif self.check_terminal(total_pred_probs) == True:
+        elif self.check_terminal() == True:
             terminal = True
         else:
             terminal = False
