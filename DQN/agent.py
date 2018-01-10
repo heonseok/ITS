@@ -156,7 +156,6 @@ class DKVMNAgent():
 
         print(action_count_list) 
         action_count_avg = np.average(np.array(action_count_list))
-        #action_count_avg = np.average(np.concatenate(action_count_list, axis=0))
         self.logger.info('Average number of actions: %f' % action_count_avg)
 
     def select_action(self):
@@ -167,38 +166,17 @@ class DKVMNAgent():
 
         if self.args.test_policy_type == 'random' or np.random.rand() < self.eps:
             action = self.env.random_action()
-            #print('\nRandom action %d' % action)
+        elif self.args.test_policy_type == 'prob_max' or self.args.test_policy_type == 'prob_min':
+            action = self.env.baseline_action()
         elif self.args.test_policy_type == 'dqn':
-            '''
-            try:
-                self.prev_q = self.q
-            except:
-                self.prev_q = 0
-            '''
 
-            '''
-            if q in locals():
-                self.prev_q = q
-            else:
-                self.prev_q = 0
-            '''
-            #shape = self.env.state_shape
-
-            #self.q = self.dqn.predict_Q_value(np.squeeze(np.random.rand(shape[0], shape[1])))[0]
             self.q = self.dqn.predict_Q_value(np.squeeze(self.env.state))[0]
 
             ## Msking problems for higher than 0.9
             self.q = self.env.mask_actions(self.q)
-            #print(self.q.shape)
 
             action = np.argmax(self.q)
             
-            #val_sum = np.sum(self.env.value_matrix)
-            #q_diff_sum = np.sum(self.q) - np.sum(self.prev_q)
-            #print(val_sum[0])
-            #print('\nselected action %d val_sum %f' % (action+1, val_sum))
-            #print('\nQ value %s and action %d sum %f' % (self.q, action+1, val_sum))
-            #print('Q diff : %.20f' %q_diff_sum)
         return action 
 
     def write_log(self, episode_count, episode_reward):

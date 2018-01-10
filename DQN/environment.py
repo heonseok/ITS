@@ -106,19 +106,28 @@ class DKVMNEnvironment(Environment):
         else: 
             return False
 
-    def baseline_act(self):
-        total_preds = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
-        best_prob_index = np.argmax(total_preds)
-        print('Action:%d, prob:%3.4f' % (best_prob_index+1, total_preds[best_prob_index]))
-        return best_prob_index+1, total_preds[best_prob_index]
+    def baseline_action(self):
+        total_preds = np.squeeze(self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix}))
+        #self.logger.debug(total_preds.shape)
+        total_preds = self.mask_actions(total_preds)
+        #self.logger.debug(total_preds.shape)
+
+        if self.args.test_policy_type == 'prob_max':
+            action = np.argmax(total_preds)
+        elif self.args.test_policy_type == 'prob_min':
+            action = np.argmin(total_preds)
+        #print('Action:%d, prob:%3.4f' % (best_prob_index+1, total_preds[best_prob_index]))
+        #self.logger.debug(action)
+        return action 
+        #return best_prob_index, total_preds[best_prob_index]
 
 
-    def mask_actions(self, q_values):
+    def mask_actions(self, values):
         total_preds = self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix})
         total_preds = total_preds >= 0.9
         mask = np.squeeze(total_preds) * self.answer_checker
 
-        return (1-mask) * q_values
+        return (1-mask) * values
 
     def act(self, action):
 

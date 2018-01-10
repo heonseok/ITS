@@ -137,7 +137,7 @@ def main():
 
         parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='value')
         parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='value')
-        parser.add_argument('--test_policy_type', type=str, choices=['random', 'dqn'], default='dqn')
+        parser.add_argument('--test_policy_type', type=str, choices=['random', 'dqn', 'prob_max', 'prob_min'], default='dqn')
 
         parser.add_argument('--num_test_episode', type=int, default=100)
 
