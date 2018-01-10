@@ -82,6 +82,7 @@ class DKVMNAgent():
                 if self.episode_reward > best_reward:
                     best_reward = self.episode_reward
                 #self.tb_logger.log_scalar(tag='reward', value=self.episode_reward, step=self.step)
+                self.tb_logger.log_scalar(tag='{}_terminal_action_count'.format(self.args.test_policy_type), value=action_count, step=self.episode_count)
                 self.reset_episode()
                 action_count = 0
 

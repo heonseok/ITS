@@ -106,9 +106,13 @@ class DKVMNEnvironment():
         
 
     def get_mask(self):
-        total_preds = self.get_prediction_probability()
-        total_preds = total_preds >= self.args.terminal_threshold
-        return total_preds * self.answer_checker
+        if self.args.terminal_condition == 'prob':
+            target = self.get_prediction_probability()
+        elif self.args.terminal_condition == 'mastery':
+            target = self.get_mastery_level() 
+
+        target_index = target >= self.args.terminal_threshold
+        return target_index * self.answer_checker
 
     def check_terminal(self):
         mask = self.get_mask()
