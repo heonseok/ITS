@@ -17,9 +17,40 @@ class DKVMNModel():
 
         tf.set_random_seed(224)
 
+        self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
+        
         self.init_model()
-        self.init_total_prediction_probability()
-        self.init_mastery_level()
+        #self.init_total_prediction_probability()
+        #self.init_mastery_level()
+
+    def inference_with_counter(self, q_embed, correlation_weight, value_matrix, reuse_flag, counter):
+        read_content = self.memory.value.read(value_matrix, correlation_weight)
+
+        ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
+        q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
+        q_embed_content = tf.tanh(q_embed_content_logit)
+
+        counter_content_logit = operations.linear(counter, 20, name='counter_content', reuse=reuse_flag)
+        counter_content = tf.sigmoid(counter_content_logit)
+
+        mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content, counter_content], 1)
+        #mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content], 1)
+
+        # f_t
+        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=reuse_flag)
+        if self.args.summary_activation == 'tanh':
+            summary_vector = tf.tanh(summary_logit)
+        elif self.args.summary_activation == 'sigmoid':
+            summary_vector = tf.sigmoid(summary_logit)
+        elif self.args.summary_activation == 'relu':
+            summary_vector = tf.nn.relu(summary_logit)
+
+        # p_t
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=reuse_flag)
+
+        pred_prob = tf.sigmoid(pred_logits)
+
+        return read_content, summary_vector, pred_logits, pred_prob
 
     def inference(self, q_embed, correlation_weight, value_matrix, reuse_flag):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
@@ -46,18 +77,6 @@ class DKVMNModel():
 
         return read_content, summary_vector, pred_logits, pred_prob
 
-    def init_total_prediction_probability(self):
-        self.total_q_data = tf.placeholder(tf.int32, [self.args.n_questions], name='total_q_data') 
-        self.total_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='total_value_matrix')
-
-        total_q_data = tf.constant(np.arange(1,self.args.n_questions+1))
-        q_embeds = self.embedding_q(total_q_data)
-        correlation_weight = self.memory.attention(q_embeds)
-       
-        stacked_total_value_matrix = tf.tile(tf.expand_dims(self.total_value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
-        _, _, _, self.total_pred_probs = self.inference(q_embeds, correlation_weight, stacked_total_value_matrix, True)
-
-        
     def init_memory(self):
         with tf.variable_scope('Memory'):
             init_memory_key = tf.get_variable('key', [self.args.memory_size, self.args.memory_key_state_dim], \
@@ -113,6 +132,9 @@ class DKVMNModel():
              pred_prob_reshaped = tf.reshape(pred_prob, [self.args.batch_size, -1])
              return tf.concat([pred_prob_reshaped, qa_embed], 1)
 
+        #elif self.args.knowledge_growth == 'mastery':
+            
+
     def init_model(self):
         # 'seq_len' means question sequences
         self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
@@ -129,6 +151,9 @@ class DKVMNModel():
         prediction = list()
         reuse_flag = False
 
+        counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
+        #counter = tf.zeros([self.args.batch_size, self.args.n_questions])
+
         # Logics
         for i in range(self.args.seq_len):
             # To reuse linear vectors
@@ -139,12 +164,21 @@ class DKVMNModel():
             qa = tf.squeeze(slice_qa_data[i], 1)
             a = tf.cast(tf.greater(qa, tf.constant(self.args.n_questions)), tf.float32)
 
+            '''
+            one_hot_q = tf.one_hot(q, self.args.n_questions)
+            counter = counter + one_hot_q
+            '''
+
+            
+
             q_embed = self.embedding_q(q)
+            counter = counter + q_embed
             qa_embed = self.embedding_qa(qa)
 
             correlation_weight = self.memory.attention(q_embed)
                 
-            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, reuse_flag)
+            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
+            #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, reuse_flag)
             prediction.append(prev_pred_logit)
 
             knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob)
@@ -397,6 +431,17 @@ class DKVMNModel():
         qa = q + tf.multiply(a, self.args.n_questions)[0]
 
         return qa 
+
+    def init_total_prediction_probability(self):
+        self.total_q_data = tf.placeholder(tf.int32, [self.args.n_questions], name='total_q_data') 
+        self.total_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='total_value_matrix')
+
+        total_q_data = tf.constant(np.arange(1,self.args.n_questions+1))
+        q_embeds = self.embedding_q(total_q_data)
+        correlation_weight = self.memory.attention(q_embeds)
+       
+        stacked_total_value_matrix = tf.tile(tf.expand_dims(self.total_value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
+        _, _, _, self.total_pred_probs = self.inference(q_embeds, correlation_weight, stacked_total_value_matrix, True)
 
     def init_step(self):
         # q : action for RL

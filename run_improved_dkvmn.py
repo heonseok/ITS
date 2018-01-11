@@ -1,6 +1,6 @@
 import os 
 
-# 'origin', 'value_matrix', 'read_content', 'summary', 'pred_prob'
+# 'origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'
 knowledge_growth_list = ['read_content']
 
 # 'sigmoid', 'tanh', 'relu'
@@ -38,14 +38,17 @@ for knowledge_growth in knowledge_growth_list:
                                 args_list = []
                                 args_list.append('python main.py')
 
-                                args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train t --dqn_test t')
+                                args_list.append('--prefix SigEmbedCounter_')
+
+                                args_list.append('--dkvmn_train t --dkvmn_test t --dkvmn_ideal_test f --dqn_train f --dqn_test f')
                                 args_list.append('--gpu_id 0 --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
 
                                 args_list.append('--test_policy_type dqn')
                                 #args_list.append('--test_policy_type prob_max')
                                 args_list.append('--logging_level INFO')
 
-                                args_list.append('--dataset synthetic')
+                                args_list.append('--dataset assist2009_updated')
+                                #args_list.append('--dataset synthetic')
 
                                 args_list.append('--knowledge_growth')
                                 args_list.append(knowledge_growth)
