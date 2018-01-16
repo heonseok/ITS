@@ -591,7 +591,8 @@ class DKVMNModel():
 
     @property
     def model_dir(self):
-        return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.dataset, self.args.initial_lr, self.args.num_epochs)
+        return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.initial_lr, self.args.num_epochs)
+        #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.dataset, self.args.initial_lr, self.args.num_epochs)
 
     def load(self):
         checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)

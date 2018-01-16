@@ -40,8 +40,9 @@ for knowledge_growth in knowledge_growth_list:
 
                                 #args_list.append('--prefix SigEmbedCounter_')
 
-                                args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train t --dqn_test t')
-                                args_list.append('--gpu_id 1 --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
+                                args_list.append('--dkvmn_train t --dkvmn_test f --dkvmn_ideal_test f --dqn_train t --dqn_test t')
+                                args_list.append('--gpu_id 1')
+                                #args_list.append('--gpu_id 1 --dkvmn_checkpoint_dir DKVMN/100epoch_checkpoint')
 
                                 args_list.append('--test_policy_type dqn')
                                 #args_list.append('--test_policy_type prob_max')

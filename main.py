@@ -137,8 +137,10 @@ def main():
             myArgs.dqn_train = False 
 
         ### check dkvmn dir ###
+        myArgs.dkvmn_checkpoint_dir = os.path.join(myArgs.dkvmn_checkpoint_dir, myArgs.dataset)
         if not os.path.exists(myArgs.dkvmn_checkpoint_dir): 
             os.makedirs(myArgs.dkvmn_checkpoint_dir)
+
         if not os.path.exists(myArgs.dkvmn_log_dir):
             os.makedirs(myArgs.dkvmn_log_dir)
 
