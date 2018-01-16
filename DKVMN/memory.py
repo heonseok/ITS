@@ -35,6 +35,27 @@ class DKVMN_Memory():
         #print('Correlation weight shape : %s' % (correlation_weight.get_shape()))
         return correlation_weight
 
+    
+    def read_for_mastery(self, value_matrix, correlation_weight):
+        '''
+            Value matrix : [batch size, memory size, memory size, memory state dim]
+            Correlation weight : [batch size, memory size, memory size], each element represents each concept embedding for 1 question
+        '''
+        # Reshaping
+        # [batch size * memory size, memory state dim(d_v)]
+        vmtx_reshaped = tf.reshape(value_matrix, [-1, self.memory_size, self.memory_state_dim])
+        # [batch size * memory size, 1]
+        cw_reshaped = tf.reshape(correlation_weight, [-1, self.memory_size, 1])        
+        #print('Transformed shape : %s, %s' %(vmtx_reshaped.get_shape(), cw_reshaped.get_shape()))
+        # Read content, will be [batch size * memory size, memory state dim] and reshape it to [batch size, memory size, memory state dim]
+        rc = tf.multiply(vmtx_reshaped, cw_reshaped)
+        read_content = tf.reshape(rc, [-1, self.memory_size, self.memory_size, self.memory_state_dim])
+        # Summation through memory size axis, make it [batch size, memory state dim(d_v)]
+        #read_content = tf.log(tf.reduce_sum(read_content, axis=1, keep_dims=False))
+        read_content = tf.reduce_sum(read_content, axis=2, keep_dims=False)
+        #print('Read content shape : %s' % (read_content.get_shape()))
+        return read_content
+
     # Getting read content
     def read(self, value_matrix, correlation_weight):
         '''

@@ -79,7 +79,7 @@ def main():
         parser.add_argument('--data_name', type=str, default='assist2009_updated')
 
         ########## Modified DKVMN ##########
-        parser.add_argument('--knowledge_growth', type=str, choices=['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob'], default='value_matrix')
+        parser.add_argument('--knowledge_growth', type=str, choices=['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'], default='value_matrix')
         parser.add_argument('--add_signal_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
         parser.add_argument('--erase_signal_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
         parser.add_argument('--summary_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')

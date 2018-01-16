@@ -78,6 +78,50 @@ class DKVMNModel():
 
         return read_content, summary_vector, pred_logits, pred_prob
 
+    def calculate_mastery_level(self, value_matrix, reuse_flag):
+        #self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
+        #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
+
+        one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
+        stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
+        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 1), tf.stack([1, self.args.memory_size, 1, 1]))
+
+        # read_content : batch_size memory_size memory_state_dim 
+        read_content = self.memory.value.read_for_mastery(stacked_mastery_value_matrix, stacked_one_hot_correlation_weight)
+        #read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
+        #print('READ content shape')
+        #print(read_content.shape)
+
+        zero_q_embed = tf.zeros(shape=[self.args.batch_size, self.args.memory_size, self.args.memory_key_state_dim]) 
+        #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions]) 
+
+        #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
+        #zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
+
+        mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 2)
+        mastery_level_prior_difficulty_reshaped = tf.reshape(mastery_level_prior_difficulty, shape=[self.args.batch_size*self.args.memory_size, -1])
+        #print('Mastery level prior difficulty')
+        #print(mastery_level_prior_difficulty.shape)
+
+        # f_t
+        summary_logit = operations.linear(mastery_level_prior_difficulty_reshaped, self.args.final_fc_dim, name='Summary_Vector', reuse=reuse_flag)
+        if self.args.summary_activation == 'tanh':
+            summary_vector = tf.tanh(summary_logit)
+        elif self.args.summary_activation == 'sigmoid':
+            summary_vector = tf.sigmoid(summary_logit)
+        elif self.args.summary_activation == 'relu':
+            summary_vector = tf.nn.relu(summary_logit)
+
+        # p_t
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=reuse_flag)
+
+        pred_logits_reshaped = tf.reshape(pred_logits, shape=[self.args.batch_size, -1])
+        #print('HEllow owrld')
+        #print(tf.shape(pred_logits_reshaped))
+
+        return tf.sigmoid(pred_logits)
+        #self.concept_mastery_level = tf.sigmoid(pred_logits)
+
     def init_memory(self):
         with tf.variable_scope('Memory'):
             init_memory_key = tf.get_variable('key', [self.args.memory_size, self.args.memory_key_state_dim], \
@@ -89,10 +133,10 @@ class DKVMNModel():
         # First expand dim at axis 0 so that makes 'batch size' axis and tile it along 'batch size' axis
         # tf.tile(inputs, multiples) : multiples length must be thes saame as the number of dimensions in input
         # tf.stack takes a list and convert each element to a tensor
-        stacked_init_memory_value = tf.tile(tf.expand_dims(self.init_memory_value, 0), tf.stack([self.args.batch_size, 1, 1]))
+        self.stacked_init_memory_value = tf.tile(tf.expand_dims(self.init_memory_value, 0), tf.stack([self.args.batch_size, 1, 1]))
                 
         return DKVMN(self.args.memory_size, self.args.memory_key_state_dim, \
-                self.args.memory_value_state_dim, init_memory_key=init_memory_key, init_memory_value=stacked_init_memory_value, args=self.args, name='DKVMN')
+                self.args.memory_value_state_dim, init_memory_key=init_memory_key, init_memory_value=self.stacked_init_memory_value, args=self.args, name='DKVMN')
 
     def init_embedding_mtx(self):
         # Embedding to [batch size, seq_len, memory_state_dim(d_k or d_v)]
@@ -113,27 +157,30 @@ class DKVMNModel():
         return tf.nn.embedding_lookup(self.qa_embed_mtx, qa)
         
 
-    def calculate_knowledge_growth(self, value_matrix, correlation_weight, qa_embed, read_content, summary, pred_prob):
+    def calculate_knowledge_growth(self, value_matrix, correlation_weight, qa_embed, read_content, summary, pred_prob, mastery_level):
         if self.args.knowledge_growth == 'origin': 
-             return qa_embed
+            return qa_embed
         
         elif self.args.knowledge_growth == 'value_matrix':
-             value_matrix_reshaped = tf.reshape(value_matrix, [self.args.batch_size, -1])
-             return tf.concat([value_matrix_reshaped, qa_embed], 1)
+            value_matrix_reshaped = tf.reshape(value_matrix, [self.args.batch_size, -1])
+            return tf.concat([value_matrix_reshaped, qa_embed], 1)
 
         elif self.args.knowledge_growth == 'read_content':
-             read_content_reshaped = tf.reshape(read_content, [self.args.batch_size, -1])
-             return tf.concat([read_content_reshaped, qa_embed], 1)
+            read_content_reshaped = tf.reshape(read_content, [self.args.batch_size, -1])
+            return tf.concat([read_content_reshaped, qa_embed], 1)
 
         elif self.args.knowledge_growth == 'summary':
-             summary_reshaped = tf.reshape(summary, [self.args.batch_size, -1])
-             return tf.concat([summary_reshaped, qa_embed], 1)
+            summary_reshaped = tf.reshape(summary, [self.args.batch_size, -1])
+            return tf.concat([summary_reshaped, qa_embed], 1)
  
         elif self.args.knowledge_growth == 'pred_prob':
-             pred_prob_reshaped = tf.reshape(pred_prob, [self.args.batch_size, -1])
-             return tf.concat([pred_prob_reshaped, qa_embed], 1)
+            pred_prob_reshaped = tf.reshape(pred_prob, [self.args.batch_size, -1])
+            return tf.concat([pred_prob_reshaped, qa_embed], 1)
 
-        #elif self.args.knowledge_growth == 'mastery':
+        elif self.args.knowledge_growth == 'mastery':
+            mastery_reshaped = tf.reshape(mastery_level, [self.args.batch_size, -1])
+            return tf.concat([mastery_reshaped, qa_embed], 1)
+            
             
 
     def init_model(self):
@@ -177,12 +224,14 @@ class DKVMNModel():
             qa_embed = self.embedding_qa(qa)
 
             correlation_weight = self.memory.attention(q_embed)
+
+            prev_mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, reuse_flag)
                 
             #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
-            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, reuse_flag)
+            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, True)
             prediction.append(prev_pred_logit)
 
-            knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob)
+            knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, prev_mastery_level)
             self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a, reuse_flag)
 
         # 'prediction' : seq_len length list of [batch size ,1], make it [batch size, seq_len] tensor
