@@ -98,8 +98,8 @@ def main():
 
         ########## DQN ##########
         parser.add_argument('--batch_size_dqn', type=int, default=32)
-        parser.add_argument('--max_step', type=int, default=50000)
-        parser.add_argument('--max_exploration_step', type=int, default=50000)
+        parser.add_argument('--max_step', type=int, default=500000)
+        parser.add_argument('--max_exploration_step', type=int, default=500000)
 
         parser.add_argument('--replay_memory_size', type=int, default=10000)
 
@@ -133,6 +133,9 @@ def main():
         myArgs = parser.parse_args()
         setHyperParamsForDataset(myArgs)
 
+
+        myArgs.episode_maxstep = myArgs.n_questions * 10
+        
         if myArgs.test_policy_type != 'dqn':
             myArgs.dqn_train = False 
 
@@ -140,7 +143,6 @@ def main():
         myArgs.dkvmn_checkpoint_dir = os.path.join(myArgs.dkvmn_checkpoint_dir, myArgs.dataset)
         if not os.path.exists(myArgs.dkvmn_checkpoint_dir): 
             os.makedirs(myArgs.dkvmn_checkpoint_dir)
-
         if not os.path.exists(myArgs.dkvmn_log_dir):
             os.makedirs(myArgs.dkvmn_log_dir)
 
