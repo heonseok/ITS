@@ -243,7 +243,8 @@ class DKVMNModel():
         self.train_count = 0
         if self.args.init_from:
             if self.load():
-                print('Checkpoint_loaded')
+                print('Checkpoint exists and skip training')
+                return 
             else:
                 print('No checkpoint')
         else:
