@@ -56,10 +56,11 @@ class DKVMNModel():
         read_content = self.memory.value.read(value_matrix, correlation_weight)
 
         ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
-        q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
-        q_embed_content = tf.tanh(q_embed_content_logit)
+        #q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
+        #q_embed_content = tf.tanh(q_embed_content_logit)
 
-        mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content], 1)
+        mastery_level_prior_difficulty = tf.concat([read_content, q_embed], 1)
+        #mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content], 1)
 
         # f_t
         summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=reuse_flag)
