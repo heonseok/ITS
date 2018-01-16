@@ -131,6 +131,9 @@ class DKVMNAgent():
         action_count = 0
         action_count_list = [] 
     
+        episode_access = []
+        episode_correct = []
+
         self.reset_episode()
         for episode in range(self.args.num_test_episode):
             current_reward = 0
@@ -146,7 +149,10 @@ class DKVMNAgent():
                 current_reward += reward
                 if terminal:
                     action_count_list.append(action_count)
-                    self.reset_episode()
+                    access, correct = self.reset_episode()
+                    episode_access.append(access)
+                    episode_correct.append(correct)
+
                     action_count = 0
                     break
 
@@ -158,7 +164,9 @@ class DKVMNAgent():
 
         print(action_count_list) 
         action_count_avg = np.average(np.array(action_count_list))
-        self.logger.info('Average number of actions: %f' % action_count_avg)
+        access_avg = np.average(np.array(episode_access))
+        correct_avg = np.average(np.array(episode_correct))
+        self.logger.info('Average number of access: %f, correct: %f, actions: %f' % (access_avg, correct_avg, action_count_avg))
 
     def select_action(self):
         if self.args.dqn_train:
@@ -216,9 +224,11 @@ class DKVMNAgent():
             return False
 
     def reset_episode(self):
-        self.env.new_episode()
+        access, correct = self.env.new_episode()
         #self.write_log(self.episode_count, self.episode_reward)
         self.env.episode_step = 0
         #print('Episode rewards :%3.4f' % self.episode_reward)
         self.episode_reward = 0
+
+        return access, correct 
 
