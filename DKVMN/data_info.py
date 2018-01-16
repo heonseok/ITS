@@ -80,34 +80,32 @@ class DATA_Analyzer():
         print('Total access array')
         for idx in range(self.n_questions):
             print('{} : {}'.format(idx+1, total_access_arr[idx]))
-        print(np.sum(total_access_arr))
+        print('Total number of access : {}'.format(np.sum(total_access_arr)))
 
-        print('Average sequence len')
-        print(np.average(sequence_len_list))
+        print('Average sequence len : {:.4f}'.format(np.average(sequence_len_list)))
 
-        print('Average correct rate')
-        print(np.average(correct_rate_list))
+        print('Average correct rate : {:.4f}'.format(np.average(correct_rate_list)))
         #print(correct_rate_list)
 
-        print('Average net correct rate')
-        print(np.average(net_correct_rate_list))
+        print('Average net correct rate : {:.4f}'.format(np.average(net_correct_rate_list)))
         #print(net_correct_rate_list)
 
-        print('Average neg2pos count')
-        print(np.average(answer_neg2pos_list))
+        print('Average neg2pos count : {:.4f}'.format(np.average(answer_neg2pos_list)))
         #print(answer_neg2pos_list)
 
-        print('Average pos2neg count')
-        print(np.average(answer_pos2neg_list))
+        print('Average pos2neg count : {:.4f}'.format(np.average(answer_pos2neg_list)))
         #print(answer_pos2neg_list)
             
 
 if __name__ == "__main__":
     seperate_char = ','
     n_questions = 110
-    path = 'data/assist2009_updated/assist2009_updated_train_total'
+    #path = 'data/assist2009_updated/assist2009_updated_train_total'
     #path = 'data/assist2009_updated/assist2009_updated_train_toy'
     #path = 'data/assist2009_updated/assist2009_updated_test'
+
+    n_questions = 50 
+    path = 'data/synthetic/naive_c5_q50_s4000_v1_train1'
     da = DATA_Analyzer(path, n_questions, seperate_char)
     da.analysis_dataset()
 
