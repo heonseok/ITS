@@ -28,6 +28,7 @@ class DKVMNEnvironment():
             self.state = mastery_level 
 
         self.answer_checker = np.zeros(self.num_actions)
+        self.access_checker = np.zeros(self.num_actions)
         self.action_count = 0
 
     def get_init_value_matrix(self):
@@ -60,6 +61,7 @@ class DKVMNEnvironment():
 
     def new_episode(self):
         correct = np.sum(self.answer_checker)
+        access = np.sum(self.access_checker)
         final_mastery_level = self.get_mastery_level()
 
         final_values_probs = self.get_prediction_probability()
@@ -71,6 +73,7 @@ class DKVMNEnvironment():
         ##### init variables #####
         self.value_matrix = self.get_init_value_matrix()
         self.answer_checker = np.zeros(self.num_actions)
+        self.access_checker = np.zeros(self.num_actions)
 
         starting_values_probs = self.get_prediction_probability()
         starting_mastery_level = self.get_mastery_level()
@@ -100,10 +103,11 @@ class DKVMNEnvironment():
         prob_log = 'Prob f: %.4f, d: %.4f' % (final_prob_avg, final_prob_avg - starting_prob_avg)
 
         ##### logging #####
-        self.logger.info('NEW EPISODE Corret: %d %s %s %s %s Action count: %d' % (correct, mastery_log, mastery_count_log, prob_log, prob_count_log, self.action_count))
+        self.logger.info('NEW EPISODE Access: %d, Corret: %d %s %s %s %s Action count: %d' % (access, correct, mastery_log, mastery_count_log, prob_log, prob_count_log, self.action_count))
 
         self.action_count = 0
         
+        return access, correct
 
     def get_mask(self):
         if self.args.terminal_condition == 'prob':
@@ -112,7 +116,8 @@ class DKVMNEnvironment():
             target = self.get_mastery_level() 
 
         target_index = target >= self.args.terminal_threshold
-        return target_index * self.answer_checker
+        return target_index 
+        #return target_index * self.answer_checker
 
     def check_terminal(self):
         mask = self.get_mask()
@@ -164,6 +169,8 @@ class DKVMNEnvironment():
             a = qa 
             self.answer_checker[a-1] = 0 
 
+        self.access_checker[a-1] = 1
+
 
         if self.args.reward_type == 'value':
             self.reward = np.sum(val_diff) 
@@ -197,4 +204,9 @@ class DKVMNEnvironment():
         return np.squeeze(self.state), self.reward, terminal, mastery_level
 
     def random_action(self):
-        return random.randrange(0, self.num_actions)
+        while True:
+            action = random.randrange(0, self.num_actions)
+            if self.get_mask()[action] == 0:
+                break
+        return action
+        #return random.randrange(0, self.num_actions)
