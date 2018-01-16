@@ -15,13 +15,13 @@ class DKVMNModel():
         self.name = name
         self.sess = sess
 
-        tf.set_random_seed(224)
+        #tf.set_random_seed(224)
 
         self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
         
         self.init_model()
-        #self.init_total_prediction_probability()
-        #self.init_mastery_level()
+        self.init_total_prediction_probability()
+        self.init_mastery_level()
 
     def inference_with_counter(self, q_embed, correlation_weight, value_matrix, reuse_flag, counter):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
@@ -177,8 +177,8 @@ class DKVMNModel():
 
             correlation_weight = self.memory.attention(q_embed)
                 
-            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
-            #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, reuse_flag)
+            #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
+            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, reuse_flag)
             prediction.append(prev_pred_logit)
 
             knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob)
@@ -492,7 +492,12 @@ class DKVMNModel():
         read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
         print('READ content shape')
         print(read_content.shape)
-        zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions]) 
+        zero_q_embed = tf.zeros(shape=[self.args.memory_size, self.args.memory_key_state_dim]) 
+        #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions]) 
+
+        #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
+        #zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
+
         mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 1)
         print('Mastery level prior difficulty')
         print(mastery_level_prior_difficulty.shape)
