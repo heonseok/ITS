@@ -119,7 +119,7 @@ class DKVMNModel():
         #print('HEllow owrld')
         #print(tf.shape(pred_logits_reshaped))
 
-        return tf.sigmoid(pred_logits)
+        return tf.sigmoid(pred_logits_reshaped)
         #self.concept_mastery_level = tf.sigmoid(pred_logits)
 
     def init_memory(self):
@@ -519,9 +519,10 @@ class DKVMNModel():
 
         ######### Before Step ##########
         prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, reuse_flag = True)
+        prev_mastery_level = self.calculate_mastery_level(stacked_value_matrix, reuse_flag = True)
 
         ######### STEP #####################
-        knowledge_growth = self.calculate_knowledge_growth(stacked_value_matrix, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob)
+        knowledge_growth = self.calculate_knowledge_growth(stacked_value_matrix, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, prev_mastery_level)
         # TODO : refactor sampling_a_given_q to return a only for below function call
         self.stepped_value_matrix = tf.squeeze(self.memory.value.write_given_a(stacked_value_matrix, correlation_weight, knowledge_growth, a, True), axis=0)
         self.stepped_read_content, self.stepped_summary, self.stepped_pred_logits, self.stepped_pred_prob = self.inference(q_embed, correlation_weight, self.stepped_value_matrix, reuse_flag = True)
