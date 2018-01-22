@@ -132,7 +132,8 @@ class DKVMNAgent():
         action_count_list = [] 
     
         episode_access = []
-        episode_correct = []
+        episode_correct_count = []
+        episode_correct_rate = []
 
         self.reset_episode()
         for episode in range(self.args.num_test_episode):
@@ -149,9 +150,10 @@ class DKVMNAgent():
                 current_reward += reward
                 if terminal:
                     action_count_list.append(action_count)
-                    access, correct = self.reset_episode()
+                    access, correct_count, correct_rate = self.reset_episode()
                     episode_access.append(access)
-                    episode_correct.append(correct)
+                    episode_correct_count.append(correct_count)
+                    episode_correct_rate.append(correct_rate)
 
                     action_count = 0
                     break
@@ -165,8 +167,19 @@ class DKVMNAgent():
         print(action_count_list) 
         action_count_avg = np.average(np.array(action_count_list))
         access_avg = np.average(np.array(episode_access))
-        correct_avg = np.average(np.array(episode_correct))
-        self.logger.info('Average number of access: %f, correct: %f, actions: %f' % (access_avg, correct_avg, action_count_avg))
+        correct_count_avg = np.average(np.array(episode_correct_count))
+        correct_rate_avg = np.average(np.array(episode_correct_rate))
+        result = '%s policy, average number of access: %f, correct_count: %f, correct_rate: %f, actions: %f' % (self.args.test_policy_type, access_avg, correct_count_avg, correct_rate_avg, action_count_avg)
+        self.logger.info(result)
+
+        log_file_name = '{}_test_result.txt'.format(self.args.dataset)
+        log_file_path = os.path.join(self.args.dqn_test_result_dir, log_file_name)
+        log_file = open(log_file_path, 'a')
+        log_file.write('\n' + self.model_dir + '\n')
+        log_file.write(result + '\n')
+        log_file.flush()
+
+        #return result
 
     def select_action(self):
         if self.args.dqn_train:
@@ -224,11 +237,12 @@ class DKVMNAgent():
             return False
 
     def reset_episode(self):
-        access, correct = self.env.new_episode()
+        #access, correct_count, correct_rate = self.env.new_episode()
         #self.write_log(self.episode_count, self.episode_reward)
         self.env.episode_step = 0
         #print('Episode rewards :%3.4f' % self.episode_reward)
         self.episode_reward = 0
 
-        return access, correct 
+        #return access, correct, correct_rate 
+        return self.env.new_episode()
 

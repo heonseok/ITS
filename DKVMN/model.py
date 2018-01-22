@@ -457,8 +457,10 @@ class DKVMNModel():
         print('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
         self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
-        log_file_name = 'test_all_%s.txt' % self.args.gpu_id 
-        log_file = open(log_file_name, 'a')
+        
+        log_file_name = '{}_test_result.txt'.format(self.args.dataset)
+        log_file_path = os.path.join(self.args.dkvmn_test_result_dir, log_file_name)
+        log_file = open(log_file_path, 'a')
         log = 'Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy)
         log_file.write(self.model_dir + '\n')
         log_file.write(log + '\n') 

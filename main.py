@@ -78,6 +78,8 @@ def main():
         parser.add_argument('--data_dir', type=str, default='DKVMN/data')
         parser.add_argument('--data_name', type=str, default='assist2009_updated')
 
+        parser.add_argument('--dkvmn_test_result_dir', type=str, default='dkvmn_test_result')
+
         ########## Modified DKVMN ##########
         parser.add_argument('--knowledge_growth', type=str, choices=['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'], default='value_matrix')
         parser.add_argument('--add_signal_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
@@ -98,8 +100,8 @@ def main():
 
         ########## DQN ##########
         parser.add_argument('--batch_size_dqn', type=int, default=32)
-        parser.add_argument('--max_step', type=int, default=500000)
-        parser.add_argument('--max_exploration_step', type=int, default=500000)
+        parser.add_argument('--max_step', type=int, default=50000)
+        parser.add_argument('--max_exploration_step', type=int, default=50000)
 
         parser.add_argument('--replay_memory_size', type=int, default=10000)
 
@@ -130,6 +132,8 @@ def main():
         parser.add_argument('--terminal_condition', type=str, choices=['prob, mastery'], default='prob')
         parser.add_argument('--terminal_threshold', type=float, default=0.9)
 
+        parser.add_argument('--dqn_test_result_dir', type=str, default='dqn_test_result')
+
         myArgs = parser.parse_args()
         setHyperParamsForDataset(myArgs)
 
@@ -145,6 +149,10 @@ def main():
             os.makedirs(myArgs.dkvmn_checkpoint_dir)
         if not os.path.exists(myArgs.dkvmn_log_dir):
             os.makedirs(myArgs.dkvmn_log_dir)
+        if not os.path.exists(myArgs.dkvmn_test_result_dir):
+            os.makedirs(myArgs.dkvmn_test_result_dir)
+        if not os.path.exists(myArgs.dqn_test_result_dir):
+            os.makedirs(myArgs.dqn_test_result_dir)
 
         data = DATA_LOADER(myArgs.n_questions, myArgs.seq_len, ',')
         data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)

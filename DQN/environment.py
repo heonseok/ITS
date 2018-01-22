@@ -27,8 +27,10 @@ class DKVMNEnvironment():
             self.state_shape = [self.args.memory_size] 
             self.state = mastery_level 
 
-        self.answer_checker = np.zeros(self.num_actions)
-        self.access_checker = np.zeros(self.num_actions)
+        self.net_correct_arr = np.zeros(self.num_actions)
+        self.access_arr = np.zeros(self.num_actions)
+
+        self.correct_counter = 0
         self.action_count = 0
 
     def get_init_value_matrix(self):
@@ -60,8 +62,11 @@ class DKVMNEnvironment():
             
 
     def new_episode(self):
-        correct = np.sum(self.answer_checker)
-        access = np.sum(self.access_checker)
+        net_correct_count = np.sum(self.net_correct_arr)
+        access = np.sum(self.access_arr)
+        
+        net_correct_rate = net_correct_count / access 
+
         final_mastery_level = self.get_mastery_level()
 
         final_values_probs = self.get_prediction_probability()
@@ -72,8 +77,9 @@ class DKVMNEnvironment():
 
         ##### init variables #####
         self.value_matrix = self.get_init_value_matrix()
-        self.answer_checker = np.zeros(self.num_actions)
-        self.access_checker = np.zeros(self.num_actions)
+        self.net_correct_arr = np.zeros(self.num_actions)
+        self.access_arr = np.zeros(self.num_actions)
+        self.correct_counter = 0
 
         starting_values_probs = self.get_prediction_probability()
         starting_mastery_level = self.get_mastery_level()
@@ -103,11 +109,11 @@ class DKVMNEnvironment():
         prob_log = 'Prob f: %.4f, d: %.4f' % (final_prob_avg, final_prob_avg - starting_prob_avg)
 
         ##### logging #####
-        self.logger.info('NEW EPISODE Access: %d, Corret: %d %s %s %s %s Action count: %d' % (access, correct, mastery_log, mastery_count_log, prob_log, prob_count_log, self.action_count))
+        self.logger.info('NEW EPISODE Access: %d, Corret count: %d rate: %f, %s %s %s %s Action count: %d' % (access, net_correct_count, net_correct_rate, mastery_log, mastery_count_log, prob_log, prob_count_log, self.action_count))
 
         self.action_count = 0
         
-        return access, correct
+        return access, net_correct_count, net_correct_rate
 
     def get_mask(self):
         if self.args.terminal_condition == 'prob':
@@ -117,7 +123,7 @@ class DKVMNEnvironment():
 
         target_index = target >= self.args.terminal_threshold
         return target_index 
-        #return target_index * self.answer_checker
+        #return target_index * self.net_correct_arr
 
     def check_terminal(self):
         mask = self.get_mask()
@@ -164,12 +170,12 @@ class DKVMNEnvironment():
  
         if qa > self.num_actions:
             a = qa - self.num_actions
-            self.answer_checker[a-1] = 1 
+            self.net_correct_arr[a-1] = 1 
         else:
             a = qa 
-            self.answer_checker[a-1] = 0 
+            self.net_correct_arr[a-1] = 0 
 
-        self.access_checker[a-1] = 1
+        self.access_arr[a-1] = 1
 
 
         if self.args.reward_type == 'value':
