@@ -6,6 +6,10 @@ import shutil
 from memory import DKVMN
 from sklearn import metrics
 
+from sklearn.manifold import TSNE
+from matplotlib import pyplot as plt
+from sklearn.cluster import KMeans
+
 
 
 class DKVMNModel():
@@ -467,6 +471,41 @@ class DKVMNModel():
         log_file.flush()    
         
 
+    def clustering_actions(self):
+        if self.load():
+            print('CKPT Loaded')
+        else:
+            raise Exception('CKPT need')
+
+        value_matrix = self.sess.run(self.init_memory_value)
+        total_cor_weight = self.sess.run(self.total_correlation_weight, feed_dict={self.total_value_matrix : value_matrix})
+    
+        kmeans = KMeans(n_clusters=self.args.memory_size).fit(total_cor_weight)
+        #print('kmeans centers')
+        #print(kmeans.cluster_centers_)
+        cluster_labels = kmeans.predict(total_cor_weight)
+
+        vis_weight = TSNE().fit_transform(total_cor_weight)
+        vis_x = vis_weight[:,0]
+        vis_y = vis_weight[:,1]
+
+        plt.scatter(vis_x, vis_y, c=cluster_labels)
+        plt.colorbar(ticks=range(self.args.n_questions))
+
+        ids = ['{}'.format(i) for i in range(self.args.n_questions)] 
+
+        #'''
+        for _id, label, x, y in zip(ids, cluster_labels, vis_x, vis_y):
+            plt.annotate('{}'.format(_id), xy = (x,y))
+            #plt.annotate('{},{}'.format(label, _id), xy = (x,y))
+        #'''
+
+        plt.show()
+        #fig = plt.figure()
+        #fig.savefig('actions.png')
+        
+         
+
 ########################################################## FOR Reinforcement Learning ##############################################################
 
     def sampling_a_given_q(self, q, value_matrix):
@@ -485,16 +524,17 @@ class DKVMNModel():
 
         return qa 
 
+
     def init_total_prediction_probability(self):
-        self.total_q_data = tf.placeholder(tf.int32, [self.args.n_questions], name='total_q_data') 
+        #self.total_q_data = tf.placeholder(tf.int32, [self.args.n_questions], name='total_q_data') 
         self.total_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='total_value_matrix')
 
         total_q_data = tf.constant(np.arange(1,self.args.n_questions+1))
         q_embeds = self.embedding_q(total_q_data)
-        correlation_weight = self.memory.attention(q_embeds)
+        self.total_correlation_weight = self.memory.attention(q_embeds)
        
         stacked_total_value_matrix = tf.tile(tf.expand_dims(self.total_value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
-        _, _, _, self.total_pred_probs = self.inference(q_embeds, correlation_weight, stacked_total_value_matrix, True)
+        _, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix, True)
 
     def init_step(self):
         # q : action for RL
@@ -645,7 +685,17 @@ class DKVMNModel():
 
     @property
     def model_dir(self):
-        return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.initial_lr, self.args.num_epochs)
+        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type)
+ 
+        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on':
+            network_spec = 'Original'
+
+        hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
+        data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
+        
+        return self.args.prefix + network_spec + hyper_parameters + data_postfix
+
+        #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.initial_lr, self.args.num_epochs)
         #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.dataset, self.args.initial_lr, self.args.num_epochs)
 
     def load(self):

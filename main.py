@@ -7,6 +7,7 @@ sys.path.append('DQN')
 
 from agent import *
 from model import *
+from clusteredDKVMN import *
 from data_loader import *
 
 def str2bool(s):
@@ -17,8 +18,8 @@ def str2bool(s):
 
 def setHyperParamsForDataset(args):
     if args.dataset == 'assist2009_updated':
-        args.batch_size = 32
-        args.memory_size = 20
+        args.batch_size = 256 
+        args.memory_size = 10
         args.memory_key_state_dim = 50
         args.memory_value_state_dim = 200
         args.final_fc_dim = 50
@@ -55,6 +56,8 @@ def main():
         ########## Control flag ##########
         parser.add_argument('--dkvmn_train', type=str2bool, default='f')
         parser.add_argument('--dkvmn_test', type=str2bool, default='f')
+        parser.add_argument('--dkvmn_clustering_actions', type=str2bool, default='f')
+
         parser.add_argument('--dqn_train', type=str2bool, default='f')
         parser.add_argument('--dqn_test', type=str2bool, default='f')
         parser.add_argument('--gpu_id', type=str, default='0')
@@ -78,6 +81,10 @@ def main():
         parser.add_argument('--data_dir', type=str, default='DKVMN/data')
         parser.add_argument('--data_name', type=str, default='assist2009_updated')
 
+        parser.add_argument('--train_postfix', type=str, default='train1')
+        parser.add_argument('--valid_postfix', type=str, default='valid1')
+        parser.add_argument('--test_postfix', type=str, default='test')
+
         parser.add_argument('--dkvmn_test_result_dir', type=str, default='dkvmn_test_result')
 
         ########## Modified DKVMN ##########
@@ -87,6 +94,12 @@ def main():
         parser.add_argument('--summary_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
         
         parser.add_argument('--write_type', type=str, choices=['add_off_erase_off', 'add_off_erase_on', 'add_on_erase_off', 'add_on_erase_on'], default='add_on_erase_on')
+
+
+        ########## Clustered DKVMN ##########
+        parser.add_argument('--clustered_dkvmn_train', type=str2bool, default='f')
+        parser.add_argument('--clustered_dkvmn_test', type=str2bool, default='f')
+        parser.add_argument('--k', type=int, default=2)
        
         ##### Default(STATICS) hyperparameter #####
         parser.add_argument('--batch_size', type=int, default=10)
@@ -173,8 +186,10 @@ def main():
             dkvmn = DKVMNModel(myArgs, sess, name='DKVMN')
             ##### DKVMN #####
             if myArgs.dkvmn_train:
-                train_data_path = os.path.join(data_directory, myArgs.data_name + '_train1')
-                valid_data_path = os.path.join(data_directory, myArgs.data_name + '_valid1')
+                train_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.train_postfix)
+                valid_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.valid_postfix)
+                #train_data_path = os.path.join(data_directory, myArgs.data_name + '_train_total')
+                #valid_data_path = os.path.join(data_directory, myArgs.data_name + '_valid1')
 
                 train_q_data, train_qa_data = data.load_data(train_data_path)
                 print('Train data loaded')
@@ -186,10 +201,21 @@ def main():
                 dkvmn.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data)
 
             if myArgs.dkvmn_test:
-                test_data_path = os.path.join(data_directory, myArgs.data_name + '_test')
+                test_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.test_postfix)
                 test_q_data, test_qa_data = data.load_data(test_data_path)
                 print('Test data loaded')
                 dkvmn.test(test_q_data, test_qa_data)
+
+            if myArgs.dkvmn_clustering_actions:
+                dkvmn.clustering_actions()
+
+
+            cDKVMN = ClusteredDKVMN(myArgs, sess, myArgs.k, dkvmn)
+            if myArgs.clustered_dkvmn_train:
+                cDKVMN.train()
+
+            if myArgs.clustered_dkvmn_test:
+                cDKVMN.test()
     
             if myArgs.dkvmn_ideal_test:
                 myArgs.batch_size = 1

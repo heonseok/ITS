@@ -123,15 +123,15 @@ if __name__ == "__main__":
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
-    #path_prefix_list = ['data/assist2009_updated/assist2009_updated_', 'data/synthetic/naive_c5_q50_s4000_v1_']
-    #file_name_list = ['assist2009, synthetic']
-    #n_questions_list = [110, 50]
+    path_prefix_list = ['data/assist2009_updated/assist2009_updated_']
+    file_name_list = ['assist2009']
+    n_questions_list = [110]
 
-    path_prefix_list = ['data/synthetic/naive_c5_q50_s4000_v1_']
-    file_name_list = ['synthetic']
-    n_questions_list = [50]
+    #path_prefix_list = ['data/synthetic/naive_c5_q50_s4000_v1_']
+    #file_name_list = ['synthetic']
+    #n_questions_list = [50]
 
-    target_file_list = ['train1', 'test'] 
+    target_file_list = ['train_total', 'test'] 
     #path = 'data/assist2009_updated/assist2009_updated_train_total'
     #path = 'data/assist2009_updated/assist2009_updated_train_toy'
     #path = 'data/assist2009_updated/assist2009_updated_test'
