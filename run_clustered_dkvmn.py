@@ -44,9 +44,10 @@ for knowledge_growth in knowledge_growth_list:
 
                                     args_list.append('--prefix MS10_')
 
-                                    args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train f --dqn_test f')
+                                    args_list.append('--dkvmn_train f --dkvmn_test t --dkvmn_ideal_test f --dqn_train f --dqn_test f')
                                     args_list.append('--dkvmn_clustering_actions f')
 
+                                    args_list.append('--k 2')
                                     args_list.append('--clustered_dkvmn_train t')
                                     args_list.append('--clustered_dkvmn_test t')
 

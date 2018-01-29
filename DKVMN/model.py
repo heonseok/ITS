@@ -189,9 +189,15 @@ class DKVMNModel():
 
     def init_model(self):
         # 'seq_len' means question sequences
+        self.q_data_seq = tf.placeholder(tf.int32, [None, self.args.seq_len], name='q_data_seq') 
+        self.qa_data_seq = tf.placeholder(tf.int32, [None, self.args.seq_len], name='qa_data')
+        self.target_seq = tf.placeholder(tf.float32, [None, self.args.seq_len], name='target')
+
+        '''
         self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
         self.qa_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='qa_data')
         self.target_seq = tf.placeholder(tf.float32, [self.args.batch_size, self.args.seq_len], name='target')
+        '''
 
         self.memory = self.init_memory()
         self.init_embedding_mtx()
@@ -201,10 +207,14 @@ class DKVMNModel():
 
         
         prediction = list()
+        mastery_level_list = list()
         reuse_flag = False
 
         counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
         #counter = tf.zeros([self.args.batch_size, self.args.n_questions])
+
+        mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
+        mastery_level_list.append(mastery_level)
 
         # Logics
         for i in range(self.args.seq_len):
@@ -221,23 +231,26 @@ class DKVMNModel():
             counter = counter + one_hot_q
             '''
 
-            
-
             q_embed = self.embedding_q(q)
             counter = counter + q_embed
             qa_embed = self.embedding_qa(qa)
 
             correlation_weight = self.memory.attention(q_embed)
 
-            prev_mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, reuse_flag)
+            #prev_mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, True)
                 
             #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
             prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, True)
             prediction.append(prev_pred_logit)
 
-            knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, prev_mastery_level)
+            knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, mastery_level)
             self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a, reuse_flag)
-
+            mastery_level = self.calculate_mastery_level(self.memory.memory_value, True)
+            mastery_level_list.append(mastery_level)
+            
+        self.mastery_level_seq = mastery_level_list
+        self.prediction_seq = tf.sigmoid(prediction) 
+        
         # 'prediction' : seq_len length list of [batch size ,1], make it [batch size, seq_len] tensor
         # tf.stack convert to [batch size, seq_len, 1]
         pred_logits = tf.reshape(tf.stack(prediction, axis=1), [self.args.batch_size, self.args.seq_len]) 
@@ -273,7 +286,7 @@ class DKVMNModel():
         print('Finish init_model')
 
 
-    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data):
+    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir=''):
         #np.random.seed(224)
         # q_data, qa_data : [samples, seq_len]
 
@@ -296,8 +309,9 @@ class DKVMNModel():
         self.train_count = 0
         if self.args.init_from:
             if self.load():
-                print('Checkpoint exists and skip training')
-                return 
+                print('Checkpoint exists')
+                #print('Checkpoint exists and skip training')
+                #return 
             else:
                 print('No checkpoint')
         else:
@@ -309,6 +323,7 @@ class DKVMNModel():
                     print('[Delete Error] %s - %s' % (e.filename, e.strerror))
         
         best_valid_auc = 0
+        early_stop_counter = 0
 
         # Training
         for epoch in range(0, self.args.num_epochs):
@@ -339,7 +354,8 @@ class DKVMNModel():
 
                 feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:self.args.initial_lr}
                 #loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
-                loss_, pred_, _, global_norm, grads, _lr = self.sess.run([self.loss, self.pred, self.train_op, self.global_norm, self.grads, self.learning_rate], feed_dict=feed_dict)
+                #loss_, pred_, _, global_norm, grads, _lr = self.sess.run([self.loss, self.pred, self.train_op, self.global_norm, self.grads, self.learning_rate], feed_dict=feed_dict)
+                loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
 
                 # Get right answer index
                 # Make [batch size * seq_len, 1]
@@ -408,14 +424,20 @@ class DKVMNModel():
                 print('%3.4f to %3.4f' % (best_valid_auc, valid_auc))
                 best_valid_auc = valid_auc
                 best_epoch = epoch + 1
-                self.save(best_epoch)
+                self.save(best_epoch, checkpoint_dir)
+            else:
+                early_stop_counter += 1 
+
+            if early_stop and early_stop_counter > self.args.early_stop_th:
+                print('Eearly stop')
+                return best_epoch
 
         return best_epoch    
     
-    def test(self, test_q, test_qa):
+    def test(self, test_q, test_qa, checkpoint_dir=''):
         steps = test_q.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
-        if self.load():
+        if self.load(checkpoint_dir):
             print('CKPT Loaded')
         else:
             raise Exception('CKPT need')
@@ -424,7 +446,9 @@ class DKVMNModel():
         #print(init_probability)
 
         pred_list = list()
+        #pred_list_2d = list()
         target_list = list()
+        #target_list_2d = list()
 
         for s in range(steps):
             test_q_batch = test_q[s*self.args.batch_size:(s+1)*self.args.batch_size, :]
@@ -437,13 +461,27 @@ class DKVMNModel():
             loss_, pred_ = self.sess.run([self.loss, self.pred], feed_dict=feed_dict)
             # Get right answer index
             # Make [batch size * seq_len, 1]
-            right_target = np.asarray(target_batch).reshape(-1,1)
-            right_pred = np.asarray(pred_).reshape(-1,1)
+
+            if s == 0:
+                pred_list_2d = pred_ 
+                target_list_2d = target_batch 
+            else:
+                pred_list_2d = np.concatenate((pred_list_2d, pred_), axis=0) 
+                target_list_2d = np.concatenate((target_list_2d, target_batch), axis=0) 
+
+            target_reshaped = np.asarray(target_batch).reshape(-1,1)
+            pred_reshaped = np.asarray(pred_).reshape(-1,1)
             # np.flatnonzero returns indices which is nonzero, convert it list 
-            right_index = np.flatnonzero(right_target != -1.).tolist()
+            right_index = np.flatnonzero(target_reshaped != -1.).tolist()
             # Number of 'training_step' elements list with [batch size * seq_len, ]
-            pred_list.append(right_pred[right_index])
-            target_list.append(right_target[right_index])
+            
+            right_pred = pred_reshaped[right_index]
+            right_target = target_reshaped[right_index]
+
+            pred_list.append(right_pred)
+            target_list.append(right_target)
+            
+            
 
         all_pred = np.concatenate(pred_list, axis=0)
         all_target = np.concatenate(target_list, axis=0)
@@ -469,6 +507,8 @@ class DKVMNModel():
         log_file.write(self.model_dir + '\n')
         log_file.write(log + '\n') 
         log_file.flush()    
+
+        return pred_list_2d, target_list_2d
         
 
     def clustering_actions(self):
@@ -698,8 +738,9 @@ class DKVMNModel():
         #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.initial_lr, self.args.num_epochs)
         #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.dataset, self.args.initial_lr, self.args.num_epochs)
 
-    def load(self):
-        checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
+    def load(self, checkpoint_dir=''):
+        if checkpoint_dir == '':
+            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
         print(checkpoint_dir)
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
@@ -712,9 +753,10 @@ class DKVMNModel():
             print('DKVMN cktp not loaded')
             return False
 
-    def save(self, global_step):
+    def save(self, global_step, checkpoint_dir=''):
         model_name = 'DKVMN'
-        checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
+        if checkpoint_dir == '':
+            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
         if not os.path.exists(checkpoint_dir):
             os.mkdir(checkpoint_dir)
         self.saver.save(self.sess, os.path.join(checkpoint_dir, model_name), global_step=global_step)

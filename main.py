@@ -18,7 +18,7 @@ def str2bool(s):
 
 def setHyperParamsForDataset(args):
     if args.dataset == 'assist2009_updated':
-        args.batch_size = 256 
+        args.batch_size = 32 
         args.memory_size = 10
         args.memory_key_state_dim = 50
         args.memory_value_state_dim = 200
@@ -70,6 +70,8 @@ def main():
         parser.add_argument('--num_epochs', type=int, default=100)
         parser.add_argument('--init_from', type=str2bool, default='t')
         parser.add_argument('--show', type=str2bool, default='f')
+        parser.add_argument('--early_stop', type=str2bool, default='f')
+        parser.add_argument('--early_stop_th', type=int, default=20)
 
         parser.add_argument('--anneal_interval', type=int, default=20)
         parser.add_argument('--maxgradnorm', type=float, default=50.0)
@@ -198,7 +200,7 @@ def main():
                 print('Shape of train data : %s, valid data : %s' % (train_q_data.shape, valid_q_data.shape))
                 print('Start training')
                 print(myArgs.seq_len)
-                dkvmn.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data)
+                dkvmn.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data, myArgs.early_stop)
 
             if myArgs.dkvmn_test:
                 test_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.test_postfix)
@@ -212,10 +214,16 @@ def main():
 
             cDKVMN = ClusteredDKVMN(myArgs, sess, myArgs.k, dkvmn)
             if myArgs.clustered_dkvmn_train:
-                cDKVMN.train()
+                train_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.train_postfix)
+                train_q_data, train_qa_data = data.load_data(train_data_path)
+
+                cDKVMN.train(train_q_data, train_qa_data)
 
             if myArgs.clustered_dkvmn_test:
-                cDKVMN.test()
+                test_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.test_postfix)
+                test_q_data, test_qa_data = data.load_data(test_data_path)
+
+                cDKVMN.test(test_q_data, test_qa_data)
     
             if myArgs.dkvmn_ideal_test:
                 myArgs.batch_size = 1
