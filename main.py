@@ -256,7 +256,15 @@ def main():
                 train_qa_data = train_data['qa']
                 print('Number of train_q_data: {}'.format(len(train_q_data)))
 
-                cDKVMN.train(train_q_data, train_qa_data)
+                valid_data = np.load(valid_data_path)
+                valid_q_data = valid_data['q']
+                valid_qa_data = valid_data['qa']
+
+                test_data = np.load(test_data_path)
+                test_q_data = test_data['q']
+                test_qa_data = test_data['qa']
+
+                cDKVMN.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data, test_q_data, test_qa_data)
 
             if myArgs.clustered_dkvmn_test:
                 test_data = np.load(test_data_path)
