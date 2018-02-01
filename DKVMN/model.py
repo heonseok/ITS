@@ -256,6 +256,11 @@ class DKVMNModel():
         # 'prediction' : seq_len length list of [batch size ,1], make it [batch size, seq_len] tensor
         # tf.stack convert to [batch size, seq_len, 1]
         pred_logits = tf.reshape(tf.stack(prediction, axis=1), [self.args.batch_size, self.args.seq_len]) 
+        self.pred = tf.sigmoid(pred_logits)
+
+        # filtered by selected_mastery_index
+        self.target_seq = self.target_seq[:, self.selected_mastery_index+1:-1]
+        pred_logits = pred_logits[:, self.selected_mastery_index+1:-1]
 
         # Define loss : standard cross entropy loss, need to ignore '-1' label example
         # Make target/label 1-d array
@@ -266,13 +271,9 @@ class DKVMNModel():
         filtered_target = tf.gather(target_1d, index)
         filtered_logits = tf.gather(pred_logits_1d, index)
 
-        # filtered by selected_mastery_index
-        filtered_target = filtered_target[:, self.selected_mastery_index+1:-1]
-        filtered_logits = filtered_logits[:, self.selected_mastery_index+1:-1]
 
         self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
         #self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
-        self.pred = tf.sigmoid(pred_logits)
 
         # Optimizer : SGD + MOMENTUM with learning rate decay
         self.global_step = tf.Variable(0, trainable=False)
@@ -293,7 +294,7 @@ class DKVMNModel():
         print('Finish init_model')
 
 
-    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir='', selected_mastery_index=0):
+    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir='', selected_mastery_index=-1):
         #np.random.seed(224)
         # q_data, qa_data : [samples, seq_len]
 
@@ -451,7 +452,7 @@ class DKVMNModel():
 
         return best_epoch    
     
-    def test(self, test_q, test_qa, checkpoint_dir='', selected_mastery_index=0):
+    def test(self, test_q, test_qa, checkpoint_dir='', selected_mastery_index=-1):
         steps = test_q.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
         if self.load(checkpoint_dir):
