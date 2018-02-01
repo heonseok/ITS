@@ -23,6 +23,8 @@ class ClusteredDKVMN():
         self.sess = sess
         self.k = k
         self.baseDKVMN = baseDKVMN
+        
+        self.target_mastery_index = self.args.target_mastery_index - 1 
 
         self.logger = logging.getLogger('cDKVMN')
         self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
@@ -34,7 +36,8 @@ class ClusteredDKVMN():
 
         self.logger.info('Initializing Clustered DKVMN')
 
-        self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_clustered'.format(self.k))
+        self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_masteryIdx_{}_clustered'.format(self.target_mastery_index,self.k))
+        #self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_masteryIdx'.format(self.target_mastery_index), '{}_clustered'.format(self.k))
         self.kmeans_path = os.path.join(self.checkpoint_dir, 'kmeans.pkl')
 
         if not os.path.exists(self.checkpoint_dir):
@@ -49,52 +52,73 @@ class ClusteredDKVMN():
     def load_clusters(self):
         return pickle.load(open(self.kmeans_path, "rb"))
 
-    def train(self, q_data, qa_data):
-        last_mastery_level = self.get_mastery_level(q_data, qa_data)
+    def train(self, train_q, train_qa, valid_q, valid_qa, test_q, test_qa):
+        self.logger.info('Start training')
+        self.logger.debug('Number of train_q: {}'.format(len(train_q)))
+
+        train_mastery_level_seq = self.get_mastery_level(train_q, train_qa)
+        train_selected_mastery_level = train_mastery_level_seq[self.target_mastery_index]
 
         if not self.clustering_exists():
-            self.build_clusters(q_data, qa_data, last_mastery_level)
+            self.build_clusters(train_q, train_qa, train_selected_mastery_level)
 
         kmeans = self.load_clusters()
         #kmeans = pickle.load(open(self.kmeans_path, "rb"))
-        clustered_q, clustered_qa = self.clustering_students(q_data, qa_data, last_mastery_level, kmeans)
+        clustered_train_q, clustered_train_qa = self.clustering_students(train_q, train_qa, train_selected_mastery_level, kmeans)
+
+        valid_mastery_level_seq = self.get_mastery_level(valid_q, valid_qa)
+        valid_selected_mastery_level = valid_mastery_level_seq[self.target_mastery_index]
+        clustered_valid_q, clustered_valid_qa = self.clustering_students(valid_q, valid_qa, valid_selected_mastery_level, kmeans)
+
+        test_mastery_level_seq = self.get_mastery_level(test_q, test_qa)
+        test_selected_mastery_level = test_mastery_level_seq[self.target_mastery_index]
+        clustered_test_q, clustered_test_qa = self.clustering_students(test_q, test_qa, test_selected_mastery_level, kmeans)
 
         for idx in range(self.k):
-            target_q = clustered_q[idx]
-            target_qa = clustered_qa[idx]
+            #target_q = clustered_q[idx]
+            #target_qa = clustered_qa[idx]
             #print(len(target_q))
 
-            self.train_subDKVMN(idx, target_q, target_qa)
+            self.train_subDKVMN(idx, clustered_train_q[idx], clustered_train_qa[idx], clustered_valid_q[idx], clustered_valid_qa[idx])
+            b_pred_list, b_target_list, c_pred_list, c_taget_list = self.test_subDKVMN(idx, clustered_test_q[idx], clustered_test_qa[idx])
 
+            if idx == 0:
+                #total_mastery_level_seq = batch_mastery_level_seq
+                b_total_pred_list = b_pred_list
+                b_total_target_list = b_target_list
+
+                c_total_pred_list = c_pred_list
+                c_total_target_list = c_target_list
+            else:
+                #total_mastery_level_seq = np.concatenate((total_mastery_level_seq, batch_mastery_level_seq), axis=1) 
+                b_total_pred_list = np.concatenate((b_total_pred_list, b_pred_list), axis=0)
+                b_total_target_list = np.concatenate((b_total_target_list, b_target_list), axis=0)
+
+                c_total_pred_list = np.concatenate((c_total_pred_list, c_pred_list), axis=0)
+                c_total_target_list = np.concatenate((c_total_target_list, c_target_list), axis=0)
+
+
+        b_auc, b_acc = self.calculate_metric(b_total_target_list, b_total_pred_list)
+        c_auc, c_acc = self.calculate_metric(c_total_target_list, c_total_pred_list)
+
+        print('Base     : auc {}, acc {}'.format(b_auc, b_acc))
+        print('Clustred : auc {}, acc {}'.format(c_auc, c_acc))
 
     def test(self, test_q, test_qa):
+        self.logger.info('Start testing')
 
         kmeans = self.load_clusters()
         #kmeans = pickle.load(open(self.kmeans_path, "rb"))
 
         # calculate matsery level for test dataset
-        last_mastery_level = self.get_mastery_level(test_q, test_qa)
+        #last_mastery_level = self.get_mastery_level(test_q, test_qa)
+        test_mastery_level_seq = self.get_mastery_level(test_q, test_qa)
+        test_selected_mastery_level = test_mastery_level_seq[self.target_mastery_index]
 
-        clustered_q, clustered_qa = self.clustering_students(test_q, test_qa, last_mastery_level, kmeans)
-        '''
-        cluster_labels = kmeans.predict(last_mastery_level)
-
-        q_data = test_q[0:len(last_mastery_level), :]
-        qa_data = test_qa[0:len(last_mastery_level), :]
-
-        clustered_q_data = list()
-        clustered_qa_data = list()
-
-        for cluster_id in range(self.k):
-            target_idx = (cluster_labels == cluster_id)
-
-            clustered_q_data.append(q_data[target_idx])
-            clustered_qa_data.append(qa_data[target_idx])
-        '''
-
+        clustered_test_q, clustered_test_qa = self.clustering_students(test_q, test_qa, test_selected_mastery_level, kmeans)
         
         for idx in range(self.k):
-            pred_list, target_list = self.test_subDKVMN(idx, clustered_q_data[idx], clustered_qa_data[idx])
+            pred_list, target_list = self.test_subDKVMN(idx, clustered_test_q[idx], clustered_test_qa[idx])
             #total_pred_list.append(pred_list)
             #total_target_list.append(target_list)
 
@@ -121,11 +145,6 @@ class ClusteredDKVMN():
            total_pred_list.append(pred_list)
            total_target_list.append(target_list)
         '''
-
-        #if np.array_equal(total_target_list[0], total_target_list[1]):
-            #print('SAME')
-
-        #self.calculate_result(total_pred_list, total_target_list[0])
     
     def calculate_metric(self, target, pred):
 
@@ -171,15 +190,16 @@ class ClusteredDKVMN():
             else:
                 total_mastery_level_seq = np.concatenate((total_mastery_level_seq, batch_mastery_level_seq), axis=1) 
 
+        return total_mastery_level_seq
 
         # seq_len+1, num_student, num_concpet
         #print(np.shape(total_mastery_level_seq))
-        last_mastery_level = total_mastery_level_seq[self.args.seq_len]
+        #last_mastery_level = total_mastery_level_seq[self.args.seq_len]
 
         #for i in range(len(last_mastery_level)):
             #print('{}th last_mastery_level: {}'.format(i,last_mastery_level[i]))
 
-        return last_mastery_level
+        #return last_mastery_level
         
         
     def build_clusters(self, q_data, qa_data, last_mastery_level):
@@ -190,14 +210,14 @@ class ClusteredDKVMN():
         #pickle.dump(kmeans, open(self.kmeans_path, "wb"))
 
 
-    def clustering_students(self, q_data, qa_data, last_mastery_level, kmeans):
+    def clustering_students(self, q_data, qa_data, selected_mastery_level, kmeans):
         self.logger.info('Clustering students')
 
-        #kmeans = KMeans(n_clusters=self.k).fit(last_mastery_level)
-        cluster_labels = kmeans.predict(last_mastery_level)
+        #kmeans = KMeans(n_clusters=self.k).fit(selected_mastery_level)
+        cluster_labels = kmeans.predict(selected_mastery_level)
 
-        q_data = q_data[0:len(last_mastery_level), :]
-        qa_data = qa_data[0:len(last_mastery_level), :]
+        q_data = q_data[0:len(selected_mastery_level), :]
+        qa_data = qa_data[0:len(selected_mastery_level), :]
 
         clustered_q_data = list()
         clustered_qa_data = list()
@@ -213,23 +233,28 @@ class ClusteredDKVMN():
         return clustered_q_data, clustered_qa_data
 
 
-    def train_subDKVMN(self, idx, target_q, target_qa):
+    def train_subDKVMN(self, idx, train_q, train_qa, valid_q, valid_qa):
         self.logger.info('Train {}-th sub DKVMN'.format(idx))
 
         # split target to train and valid 
-        train_q, test_q, train_qa, test_qa = train_test_split(target_q, target_qa, test_size=0.2)
+        #train_q, valid_q, train_qa, valid_qa = train_valid_split(tain_q, tain_qa, valid_size=0.2)
         # save sub dkvmn as original/k_clusteredDKVMN/subDKVMN_i
         sub_checkpoint_dir = os.path.join(self.checkpoint_dir, 'subDKVMN{}'.format(idx))
-        self.baseDKVMN.train(train_q, train_qa, test_q, test_qa, True, sub_checkpoint_dir) 
+        self.baseDKVMN.train(train_q, train_qa, valid_q, valid_qa, early_stop=True, checkpoint_dir=sub_checkpoint_dir) 
 
     def test_subDKVMN(self, idx, test_q, test_qa):
         self.logger.info('Test {}-th sub DKVMN'.format(idx))
 
+        test_q = test_q[:,self.target_mastery_index+1:-1]
+        test_qa = test_qa[:,self.target_mastery_index+1:-1]
+
         sub_checkpoint_dir = os.path.join(self.checkpoint_dir, 'subDKVMN{}'.format(idx))
-        pred_list, target_list = self.baseDKVMN.test(test_q, test_qa, sub_checkpoint_dir)
+        b_pred_list, b_target_list = self.baseDKVMN.test(test_q, test_qa)
+        c_pred_list, c_target_list = self.baseDKVMN.test(test_q, test_qa, sub_checkpoint_dir)
 
-        return pred_list, target_list
+        return b_pred_list, b_target_list, c_pred_list, c_target_list
 
+    '''
     def calculate_result(self, total_pred_list, target_list):
         self.logger.info('Calculate results')
         total_auc_list = list()
@@ -246,15 +271,13 @@ class ClusteredDKVMN():
                 pred_seq = pred_list[idx]
 
                 right_index = (target_seq != -1.)
-                '''
+
                 print(target_seq[~right_index])
                 print('ROC')
                 print(pred_seq[right_index])
                 print(target_seq[right_index])
                 print(roc_auc_score(target_seq[right_index], pred_seq[right_index]))
-                '''
 
-                #'''
                 try:
                     right_target = target_seq[right_index]
                     right_pred = pred_seq[right_index]
@@ -265,7 +288,6 @@ class ClusteredDKVMN():
                 except:
                     print('DEAD')
                     pass
-                #'''
 
             total_acc_list.append(acc_list)
         # TODO using max instead of greater 
@@ -303,3 +325,4 @@ class ClusteredDKVMN():
         # scenario #2-2
         # weighted ensemble
 
+    '''

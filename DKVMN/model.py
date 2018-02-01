@@ -270,7 +270,7 @@ class DKVMNModel():
         # Optimizer : SGD + MOMENTUM with learning rate decay
         self.global_step = tf.Variable(0, trainable=False)
         self.lr = tf.placeholder(tf.float32, [], name='learning_rate')
-        self.learning_rate = tf.train.exponential_decay(self.args.initial_lr, global_step=self.global_step, decay_steps=self.args.anneal_interval*(tf.shape(self.q_data_seq)[0] // self.args.batch_size), decay_rate=0.667, staircase=True)
+        #self.learning_rate = tf.train.exponential_decay(self.args.initial_lr, global_step=self.global_step, decay_steps=self.args.anneal_interval*(tf.shape(self.q_data_seq)[0] // self.args.batch_size), decay_rate=0.667, staircase=True)
         optimizer = tf.train.MomentumOptimizer(self.lr, self.args.momentum)
         grads, vrbs = zip(*optimizer.compute_gradients(self.loss))
         self.grads = grads
@@ -352,7 +352,7 @@ class DKVMNModel():
                 target_batch = (target - 1) // self.args.n_questions  
                 target_batch = target_batch.astype(np.float)
 
-                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:self.args.initial_lr}
+                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr}
                 #loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
                 #loss_, pred_, _, global_norm, grads, _lr = self.sess.run([self.loss, self.pred, self.train_op, self.global_norm, self.grads, self.learning_rate], feed_dict=feed_dict)
                 loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
@@ -504,7 +504,12 @@ class DKVMNModel():
         log_file_path = os.path.join(self.args.dkvmn_test_result_dir, log_file_name)
         log_file = open(log_file_path, 'a')
         log = 'Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy)
-        log_file.write(self.model_dir + '\n')
+
+        if checkpoint_dir == '':
+            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
+
+        log_file.write(checkpoint_dir + '\n')
+        #log_file.write(self.model_dir + '\n')
         log_file.write(log + '\n') 
         log_file.flush()    
 
@@ -555,7 +560,7 @@ class DKVMNModel():
         _, _, _, pred_prob = self.inference(q_embed, correlation_weight, value_matrix, reuse_flag = True)
 
         # TODO : arguemnt check for various algorithms
-        pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
+        #pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
 
         threshold = tf.random_uniform(pred_prob.shape)
 
@@ -731,9 +736,12 @@ class DKVMNModel():
             network_spec = 'Original'
 
         hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
-        data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
+        #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
+
+        remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
         
-        return self.args.prefix + network_spec + hyper_parameters + data_postfix
+        return self.args.prefix + network_spec + hyper_parameters + remove_short
+        #return self.args.prefix + network_spec + hyper_parameters + data_postfix
 
         #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.initial_lr, self.args.num_epochs)
         #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.dataset, self.args.initial_lr, self.args.num_epochs)

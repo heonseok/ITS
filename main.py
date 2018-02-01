@@ -10,6 +10,8 @@ from model import *
 from clusteredDKVMN import *
 from data_loader import *
 
+from sklearn.model_selection import train_test_split 
+
 def str2bool(s):
     if s.lower() in ('yes', 'y', '1', 'true', 't'):
         return True
@@ -64,6 +66,15 @@ def main():
 
         ########## Ideal test for DKVMN
         parser.add_argument('--dkvmn_ideal_test', type=str2bool, default='f')
+
+        ########## Data preprocessing #########
+        parser.add_argument('--remove_infrequent_skill', type=str2bool, default='f')
+        parser.add_argument('--frequency_th', type=int, default=50)
+
+        parser.add_argument('--remove_short_seq', type=str2bool, default='t')
+        parser.add_argument('--short_seq_len_th', type=int, default=20)
+
+        parser.add_argument('--split_data_flag', type=str2bool, default='f')
         
         ########## DKVMN ##########
         parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
@@ -83,9 +94,11 @@ def main():
         parser.add_argument('--data_dir', type=str, default='DKVMN/data')
         parser.add_argument('--data_name', type=str, default='assist2009_updated')
 
+        '''
         parser.add_argument('--train_postfix', type=str, default='train1')
         parser.add_argument('--valid_postfix', type=str, default='valid1')
         parser.add_argument('--test_postfix', type=str, default='test')
+        '''
 
         parser.add_argument('--dkvmn_test_result_dir', type=str, default='dkvmn_test_result')
 
@@ -102,6 +115,7 @@ def main():
         parser.add_argument('--clustered_dkvmn_train', type=str2bool, default='f')
         parser.add_argument('--clustered_dkvmn_test', type=str2bool, default='f')
         parser.add_argument('--k', type=int, default=2)
+        parser.add_argument('--target_mastery_index', default=5)
        
         ##### Default(STATICS) hyperparameter #####
         parser.add_argument('--batch_size', type=int, default=10)
@@ -169,8 +183,27 @@ def main():
         if not os.path.exists(myArgs.dqn_test_result_dir):
             os.makedirs(myArgs.dqn_test_result_dir)
 
-        data = DATA_LOADER(myArgs.n_questions, myArgs.seq_len, ',')
+
         data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)
+        data_path = os.path.join(data_directory, myArgs.data_name + '_data.csv')
+
+        train_data_path = os.path.join(data_directory, myArgs.data_name + '_train.npz')
+        valid_data_path = os.path.join(data_directory, myArgs.data_name + '_valid.npz')
+        test_data_path = os.path.join(data_directory, myArgs.data_name + '_test.npz')
+
+        ### Split data 
+        if myArgs.split_data_flag == True:
+            print('#####SPLIT DATA#####')
+            data = DATA_LOADER(myArgs, ',')
+            total_q_data, total_qa_data = data.load_data(data_path)
+
+            _train_q, test_q, _train_qa, test_qa = train_test_split(total_q_data, total_qa_data, test_size=0.2)
+            train_q, valid_q, train_qa, valid_qa = train_test_split(_train_q, _train_qa, test_size=0.2)
+            
+            np.savez(train_data_path, q=train_q, qa=train_qa)
+            np.savez(valid_data_path, q=valid_q, qa=valid_qa)
+            np.savez(test_data_path, q=test_q, qa=test_qa)
+
 
         ### check dqn dir ###
         if not os.path.exists(myArgs.dqn_checkpoint_dir):
@@ -188,14 +221,16 @@ def main():
             dkvmn = DKVMNModel(myArgs, sess, name='DKVMN')
             ##### DKVMN #####
             if myArgs.dkvmn_train:
-                train_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.train_postfix)
-                valid_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.valid_postfix)
-                #train_data_path = os.path.join(data_directory, myArgs.data_name + '_train_total')
-                #valid_data_path = os.path.join(data_directory, myArgs.data_name + '_valid1')
+                train_data = np.load(train_data_path)
+                train_q_data = train_data['q']
+                train_qa_data = train_data['qa']
 
-                train_q_data, train_qa_data = data.load_data(train_data_path)
                 print('Train data loaded')
-                valid_q_data, valid_qa_data = data.load_data(valid_data_path)
+                print('Number of train_q_data: {}'.format(len(train_q_data)))
+
+                valid_data = np.load(valid_data_path)
+                valid_q_data = valid_data['q']
+                valid_qa_data = valid_data['qa']
                 print('Valid data loaded')
                 print('Shape of train data : %s, valid data : %s' % (train_q_data.shape, valid_q_data.shape))
                 print('Start training')
@@ -203,8 +238,10 @@ def main():
                 dkvmn.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data, myArgs.early_stop)
 
             if myArgs.dkvmn_test:
-                test_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.test_postfix)
-                test_q_data, test_qa_data = data.load_data(test_data_path)
+                test_data = np.load(test_data_path)
+                test_q_data = test_data['q']
+                test_qa_data = test_data['qa']
+
                 print('Test data loaded')
                 dkvmn.test(test_q_data, test_qa_data)
 
@@ -214,14 +251,17 @@ def main():
 
             cDKVMN = ClusteredDKVMN(myArgs, sess, myArgs.k, dkvmn)
             if myArgs.clustered_dkvmn_train:
-                train_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.train_postfix)
-                train_q_data, train_qa_data = data.load_data(train_data_path)
+                train_data = np.load(train_data_path)
+                train_q_data = train_data['q']
+                train_qa_data = train_data['qa']
+                print('Number of train_q_data: {}'.format(len(train_q_data)))
 
                 cDKVMN.train(train_q_data, train_qa_data)
 
             if myArgs.clustered_dkvmn_test:
-                test_data_path = os.path.join(data_directory, myArgs.data_name + '_' + myArgs.test_postfix)
-                test_q_data, test_qa_data = data.load_data(test_data_path)
+                test_data = np.load(test_data_path)
+                test_q_data = test_data['q']
+                test_qa_data = test_data['qa']
 
                 cDKVMN.test(test_q_data, test_qa_data)
     

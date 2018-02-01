@@ -3,12 +3,14 @@ import os
 import tensorflow as tf
 
 class DATA_LOADER():
-    def __init__(self, n_questions, seqlen, seperate_char):
+    def __init__(self, args, seperate_char):
         # assist2009 : seq_len(200), n_questions(110)
         # Each value is seperated by seperate_char
+        self.args = args
         self.seperate_char = seperate_char
-        self.n_questions = n_questions
-        self.seq_len = seqlen
+        self.n_questions = self.args.n_questions
+        self.seq_len = self.args.seq_len
+
 
     '''
     Data format as followed
@@ -17,10 +19,9 @@ class DATA_LOADER():
     3) Answers
     '''
     # path : data location
-    def load_data(self, path):
-        npy_path_q = path+'_q.npy'
-        npy_path_qa = path+'_qa.npy'
-        csv_path = path+'.csv'
+    def load_data(self, csv_path):
+        #npy_path_q = path+'_q.npy'
+        #npy_path_qa = path+'_qa.npy'
 
         #if os.path.isfile(npy_path_q):
             #print('Load npy files')
@@ -30,16 +31,21 @@ class DATA_LOADER():
         # Question/Answer container
         q_data = list()
         qa_data = list()
+
         # Read data
+        total_seq_num = 0
         for lineid, line in enumerate(f_data):
             # strip
             line = line.strip()
             if line[-1] == self.seperate_char:
                 line = line[:-1] 
+
             # Exercise tag line
             if lineid % 3 == 1:
                 # split by ',', returns tag list
                 #print('Excercies tag')
+                total_seq_num += 1
+
                 q_tag_list = line.split(self.seperate_char)
             
             # Answer
@@ -47,6 +53,10 @@ class DATA_LOADER():
                 #print(', Answers')
                 answer_list = line.split(self.seperate_char)
             
+                if self.args.remove_short_seq:
+                    if len(q_tag_list) <= self.args.short_seq_len_th:
+                        continue
+
                 # Divide case by seq_len
                 if len(q_tag_list) > self.seq_len:
                     n_split = len(q_tag_list) // self.seq_len
@@ -93,5 +103,8 @@ class DATA_LOADER():
         #np.save(npy_path_qa, qa_data_array) 
 
         print('Load csv file')
+        #print('Total seq num: {}'.format(total_seq_num))
+        #print('q_data_array: {}'.format(len(q_data_array)))
+
         return q_data_array, qa_data_array
 

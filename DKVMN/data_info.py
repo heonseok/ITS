@@ -13,6 +13,7 @@ class DATA_Analyzer():
     def analysis_dataset(self):
         f_data = open(self.path, 'r')
 
+        total_seq_num = 0
         total_access_arr = np.zeros(self.n_questions, dtype=np.int)
         sequence_len_list = list()
 
@@ -30,6 +31,7 @@ class DATA_Analyzer():
 
             # Problem 
             if lineid % 3 == 1:
+                total_seq_num += 1
                 q_tag_list = line.split(self.seperate_char)
                 sequence_len_list.append(len(q_tag_list))
 
@@ -82,8 +84,10 @@ class DATA_Analyzer():
         #plt.show()
         #fig = plt.gcf()
         
-        print('Total access array')
+        #print('Total access array')
+        histogram = ''
         for idx in range(self.n_questions):
+            histogram +=  '{} : {}\n'.format(idx+1, total_access_arr[idx])
             print('{} : {}'.format(idx+1, total_access_arr[idx]))
 
         total_access_count = str(np.sum(total_access_arr))
@@ -114,7 +118,7 @@ class DATA_Analyzer():
         #print('Average pos2neg count : {:.4f}'.format(np.average(answer_pos2neg_list)))
         #print(answer_pos2neg_list)
             
-        return [total_access_count, avg_sequence_len, avg_correct_rate, avg_net_correct_rate, avg_neg2pos_count, avg_pos2neg_count]
+        return histogram, [str(total_seq_num), total_access_count, avg_sequence_len, avg_correct_rate, avg_net_correct_rate, avg_neg2pos_count, avg_pos2neg_count]
 
 if __name__ == "__main__":
     seperate_char = ','
@@ -131,7 +135,8 @@ if __name__ == "__main__":
     #file_name_list = ['synthetic']
     #n_questions_list = [50]
 
-    target_file_list = ['train_total', 'test'] 
+    target_file_list = ['train1_test', 'train_test', 'data'] 
+    #target_file_list = ['train1', 'train', 'train_total', 'test'] 
     #path = 'data/assist2009_updated/assist2009_updated_train_total'
     #path = 'data/assist2009_updated/assist2009_updated_train_toy'
     #path = 'data/assist2009_updated/assist2009_updated_test'
@@ -139,7 +144,7 @@ if __name__ == "__main__":
     #n_questions = 50 
     #path = 'data/synthetic/naive_c5_q50_s4000_v1_train1'
 
-    header = 'target_file, total_access_count, avg_sequence_len, avg_correct_rate, avg_net_correct_rate, avg_neg2pos_count, avg_pos2neg_count'
+    header = 'target_file, total_seq_num, total_access_count, avg_sequence_len, avg_correct_rate, avg_net_correct_rate, avg_neg2pos_count, avg_pos2neg_count'
 
     for idx, path_prefix in enumerate(path_prefix_list):
         n_questions = n_questions_list[idx] 
@@ -153,7 +158,8 @@ if __name__ == "__main__":
             path = path_prefix + target_file 
 
             da = DATA_Analyzer(path, n_questions, seperate_char)
-            info_list = da.analysis_dataset()
+            histogram, info_list = da.analysis_dataset()
             info = target_file + ',' +  ','.join(info_list)
             log_file.write(info+'\n') 
+            log_file.write(histogram)
             log_file.flush()
