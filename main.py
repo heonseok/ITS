@@ -115,7 +115,7 @@ def main():
         parser.add_argument('--clustered_dkvmn_train', type=str2bool, default='f')
         parser.add_argument('--clustered_dkvmn_test', type=str2bool, default='f')
         parser.add_argument('--k', type=int, default=2)
-        parser.add_argument('--target_mastery_index', default=5)
+        parser.add_argument('--target_mastery_index', type=int, default=5)
        
         ##### Default(STATICS) hyperparameter #####
         parser.add_argument('--batch_size', type=int, default=10)

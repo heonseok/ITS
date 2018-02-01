@@ -80,7 +80,7 @@ class ClusteredDKVMN():
             #print(len(target_q))
 
             self.train_subDKVMN(idx, clustered_train_q[idx], clustered_train_qa[idx], clustered_valid_q[idx], clustered_valid_qa[idx])
-            b_pred_list, b_target_list, c_pred_list, c_taget_list = self.test_subDKVMN(idx, clustered_test_q[idx], clustered_test_qa[idx])
+            b_pred_list, b_target_list, c_pred_list, c_target_list = self.test_subDKVMN(idx, clustered_test_q[idx], clustered_test_qa[idx])
 
             if idx == 0:
                 #total_mastery_level_seq = batch_mastery_level_seq

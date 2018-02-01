@@ -82,7 +82,7 @@ class DKVMNAgent():
                 if self.episode_reward > best_reward:
                     best_reward = self.episode_reward
                 #self.tb_logger.log_scalar(tag='reward', value=self.episode_reward, step=self.step)
-                self.tb_logger.log_scalar(tag='{}_terminal_action_count'.format(self.args.test_policy_type), value=action_count, step=self.episode_count)
+                #self.tb_logger.log_scalar(tag='{}_terminal_action_count'.format(self.args.test_policy_type), value=action_count, step=self.episode_count)
                 self.reset_episode()
                 action_count = 0
 
@@ -143,9 +143,10 @@ class DKVMNAgent():
             while not terminal:
                 action = self.select_action()
                 action_count += 1
-                self.tb_logger.log_scalar(tag='Episode%d:action'%episode, value=action, step=action_count)
+                #self.tb_logger.log_scalar(tag='Episode%d:action'%episode, value=action, step=action_count)
                 next_state, reward, terminal, mastery_level = self.env.act(action)
-                self.tb_logger.log_scalar(tag='Episode%d:reward'%episode, value=reward, step=action_count)
+                #self.tb_logger.log_scalar(tag='Episode%d:reward'%episode, value=reward, step=action_count)
+                self.tb_logger.log_scalar(tag='Episode%d:mastery'%episode, value=np.sum(mastery_level), step=action_count)
 
                 current_reward += reward
                 if terminal:

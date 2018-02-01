@@ -259,8 +259,8 @@ class DKVMNModel():
         self.pred = tf.sigmoid(pred_logits)
 
         # filtered by selected_mastery_index
-        self.target_seq = self.target_seq[:, self.selected_mastery_index+1:-1]
-        pred_logits = pred_logits[:, self.selected_mastery_index+1:-1]
+        #self.target_seq = self.target_seq[:, self.selected_mastery_index+1:]
+        #pred_logits = pred_logits[:, self.selected_mastery_index+1:]
 
         # Define loss : standard cross entropy loss, need to ignore '-1' label example
         # Make target/label 1-d array
@@ -367,8 +367,8 @@ class DKVMNModel():
                 #loss_, pred_, _, global_norm, grads, _lr = self.sess.run([self.loss, self.pred, self.train_op, self.global_norm, self.grads, self.learning_rate], feed_dict=feed_dict)
                 loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
 
-                pred_ = pred_[:,selected_mastery_index+1:-1] 
-                target_batch = target_batch[:,selected_mastery_index+1:-1]
+                pred_ = pred_[:,selected_mastery_index+1:] 
+                target_batch = target_batch[:,selected_mastery_index+1:]
 
                 # Get right answer index
                 # Make [batch size * seq_len, 1]
@@ -413,12 +413,13 @@ class DKVMNModel():
                 valid_qa = valid_qa_data[s*self.args.batch_size:(s+1)*self.args.batch_size, :]
                 # right : 1, wrong : 0, padding : -1
                 valid_target = (valid_qa - 1) // self.args.n_questions
+                valid_target = valid_target.astype(np.float)
                 valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target, self.selected_mastery_index:selected_mastery_index}
                 valid_loss, valid_pred = self.sess.run([self.loss, self.pred], feed_dict=valid_feed_dict)
                 # Same with training set
 
-                valid_pred = valid_pred[:,selected_mastery_index+1:-1] 
-                valid_target = valid_target[:,selected_mastery_index+1:-1]
+                valid_pred = valid_pred[:,selected_mastery_index+1:] 
+                valid_target = valid_target[:,selected_mastery_index+1:]
 
                 valid_right_target = np.asarray(valid_target).reshape(-1,)
                 valid_right_pred = np.asarray(valid_pred).reshape(-1,)
@@ -480,8 +481,8 @@ class DKVMNModel():
             # Get right answer index
             # Make [batch size * seq_len, 1]
 
-            pred_ = pred_[:,selected_mastery_index+1:-1] 
-            target_batch = target_batch[:,selected_mastery_index+1:-1]
+            pred_ = pred_[:,selected_mastery_index+1:] 
+            target_batch = target_batch[:,selected_mastery_index+1:]
             
             if s == 0:
                 pred_list_2d = pred_ 
@@ -756,7 +757,8 @@ class DKVMNModel():
         if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on':
             network_spec = 'Original'
 
-        hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
+        hyper_parameters = '_lr{}_{}epochs'.format(self.args.initial_lr, self.args.num_epochs)
+        #hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
         #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
 
         remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
