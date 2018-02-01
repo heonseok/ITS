@@ -24,7 +24,7 @@ class ClusteredDKVMN():
         self.k = k
         self.baseDKVMN = baseDKVMN
         
-        self.target_mastery_index = self.args.target_mastery_index - 1 
+        self.selected_mastery_index = self.args.target_mastery_index - 1 
 
         self.logger = logging.getLogger('cDKVMN')
         self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
@@ -36,8 +36,8 @@ class ClusteredDKVMN():
 
         self.logger.info('Initializing Clustered DKVMN')
 
-        self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_masteryIdx_{}_clustered'.format(self.target_mastery_index,self.k))
-        #self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_masteryIdx'.format(self.target_mastery_index), '{}_clustered'.format(self.k))
+        self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_masteryIdx_{}_clustered'.format(self.selected_mastery_index+1, self.k))
+        #self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_masteryIdx'.format(self.selected_mastery_index), '{}_clustered'.format(self.k))
         self.kmeans_path = os.path.join(self.checkpoint_dir, 'kmeans.pkl')
 
         if not os.path.exists(self.checkpoint_dir):
@@ -57,7 +57,7 @@ class ClusteredDKVMN():
         self.logger.debug('Number of train_q: {}'.format(len(train_q)))
 
         train_mastery_level_seq = self.get_mastery_level(train_q, train_qa)
-        train_selected_mastery_level = train_mastery_level_seq[self.target_mastery_index]
+        train_selected_mastery_level = train_mastery_level_seq[self.selected_mastery_index]
 
         if not self.clustering_exists():
             self.build_clusters(train_q, train_qa, train_selected_mastery_level)
@@ -67,11 +67,11 @@ class ClusteredDKVMN():
         clustered_train_q, clustered_train_qa = self.clustering_students(train_q, train_qa, train_selected_mastery_level, kmeans)
 
         valid_mastery_level_seq = self.get_mastery_level(valid_q, valid_qa)
-        valid_selected_mastery_level = valid_mastery_level_seq[self.target_mastery_index]
+        valid_selected_mastery_level = valid_mastery_level_seq[self.selected_mastery_index]
         clustered_valid_q, clustered_valid_qa = self.clustering_students(valid_q, valid_qa, valid_selected_mastery_level, kmeans)
 
         test_mastery_level_seq = self.get_mastery_level(test_q, test_qa)
-        test_selected_mastery_level = test_mastery_level_seq[self.target_mastery_index]
+        test_selected_mastery_level = test_mastery_level_seq[self.selected_mastery_index]
         clustered_test_q, clustered_test_qa = self.clustering_students(test_q, test_qa, test_selected_mastery_level, kmeans)
 
         for idx in range(self.k):
@@ -113,7 +113,7 @@ class ClusteredDKVMN():
         # calculate matsery level for test dataset
         #last_mastery_level = self.get_mastery_level(test_q, test_qa)
         test_mastery_level_seq = self.get_mastery_level(test_q, test_qa)
-        test_selected_mastery_level = test_mastery_level_seq[self.target_mastery_index]
+        test_selected_mastery_level = test_mastery_level_seq[self.selected_mastery_index]
 
         clustered_test_q, clustered_test_qa = self.clustering_students(test_q, test_qa, test_selected_mastery_level, kmeans)
         
@@ -240,17 +240,17 @@ class ClusteredDKVMN():
         #train_q, valid_q, train_qa, valid_qa = train_valid_split(tain_q, tain_qa, valid_size=0.2)
         # save sub dkvmn as original/k_clusteredDKVMN/subDKVMN_i
         sub_checkpoint_dir = os.path.join(self.checkpoint_dir, 'subDKVMN{}'.format(idx))
-        self.baseDKVMN.train(train_q, train_qa, valid_q, valid_qa, early_stop=True, checkpoint_dir=sub_checkpoint_dir) 
+        self.baseDKVMN.train(train_q, train_qa, valid_q, valid_qa, early_stop=True, checkpoint_dir=sub_checkpoint_dir, selected_mastery_index=self.selected_mastery_index)
 
     def test_subDKVMN(self, idx, test_q, test_qa):
         self.logger.info('Test {}-th sub DKVMN'.format(idx))
 
-        test_q = test_q[:,self.target_mastery_index+1:-1]
-        test_qa = test_qa[:,self.target_mastery_index+1:-1]
+        #test_q = test_q[:,self.selected_mastery_index+1:-1]
+        #test_qa = test_qa[:,self.selected_mastery_index+1:-1]
 
         sub_checkpoint_dir = os.path.join(self.checkpoint_dir, 'subDKVMN{}'.format(idx))
         b_pred_list, b_target_list = self.baseDKVMN.test(test_q, test_qa)
-        c_pred_list, c_target_list = self.baseDKVMN.test(test_q, test_qa, sub_checkpoint_dir)
+        c_pred_list, c_target_list = self.baseDKVMN.test(test_q, test_qa, sub_checkpoint_dir, self.selected_mastery_index)
 
         return b_pred_list, b_target_list, c_pred_list, c_target_list
 

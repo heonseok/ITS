@@ -193,6 +193,8 @@ class DKVMNModel():
         self.qa_data_seq = tf.placeholder(tf.int32, [None, self.args.seq_len], name='qa_data')
         self.target_seq = tf.placeholder(tf.float32, [None, self.args.seq_len], name='target')
 
+        self.selected_mastery_index = tf.placeholder(tf.int32, name='selected_mastery_index')
+
         '''
         self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
         self.qa_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='qa_data')
@@ -249,7 +251,7 @@ class DKVMNModel():
             mastery_level_list.append(mastery_level)
             
         self.mastery_level_seq = mastery_level_list
-        self.prediction_seq = tf.sigmoid(prediction) 
+        #self.prediction_seq = tf.sigmoid(prediction) 
         
         # 'prediction' : seq_len length list of [batch size ,1], make it [batch size, seq_len] tensor
         # tf.stack convert to [batch size, seq_len, 1]
@@ -263,6 +265,11 @@ class DKVMNModel():
         # tf.gather(params, indices) : Gather slices from params according to indices
         filtered_target = tf.gather(target_1d, index)
         filtered_logits = tf.gather(pred_logits_1d, index)
+
+        # filtered by selected_mastery_index
+        filtered_target = filtered_target[:, self.selected_mastery_index+1:-1]
+        filtered_logits = filtered_logits[:, self.selected_mastery_index+1:-1]
+
         self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
         #self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
         self.pred = tf.sigmoid(pred_logits)
@@ -286,7 +293,7 @@ class DKVMNModel():
         print('Finish init_model')
 
 
-    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir=''):
+    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir='', selected_mastery_index=0):
         #np.random.seed(224)
         # q_data, qa_data : [samples, seq_len]
 
@@ -354,10 +361,13 @@ class DKVMNModel():
                 target_batch = (target - 1) // self.args.n_questions  
                 target_batch = target_batch.astype(np.float)
 
-                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr}
+                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr, self.selected_mastery_index:selected_mastery_index}
                 #loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
                 #loss_, pred_, _, global_norm, grads, _lr = self.sess.run([self.loss, self.pred, self.train_op, self.global_norm, self.grads, self.learning_rate], feed_dict=feed_dict)
                 loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
+
+                pred_ = pred_[:,selected_mastery_index+1:-1] 
+                target_batch = target_batch[:,selected_mastery_index+1:-1]
 
                 # Get right answer index
                 # Make [batch size * seq_len, 1]
@@ -402,9 +412,13 @@ class DKVMNModel():
                 valid_qa = valid_qa_data[s*self.args.batch_size:(s+1)*self.args.batch_size, :]
                 # right : 1, wrong : 0, padding : -1
                 valid_target = (valid_qa - 1) // self.args.n_questions
-                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target}
+                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target, self.selected_mastery_index:selected_mastery_index}
                 valid_loss, valid_pred = self.sess.run([self.loss, self.pred], feed_dict=valid_feed_dict)
                 # Same with training set
+
+                valid_pred = valid_pred[:,selected_mastery_index+1:-1] 
+                valid_target = valid_target[:,selected_mastery_index+1:-1]
+
                 valid_right_target = np.asarray(valid_target).reshape(-1,)
                 valid_right_pred = np.asarray(valid_pred).reshape(-1,)
                 valid_right_index = np.flatnonzero(valid_right_target != -1).tolist()    
@@ -437,7 +451,7 @@ class DKVMNModel():
 
         return best_epoch    
     
-    def test(self, test_q, test_qa, checkpoint_dir=''):
+    def test(self, test_q, test_qa, checkpoint_dir='', selected_mastery_index=0):
         steps = test_q.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
         if self.load(checkpoint_dir):
@@ -460,11 +474,14 @@ class DKVMNModel():
             target = target.astype(np.int)
             target_batch = (target - 1) // self.args.n_questions  
             target_batch = target_batch.astype(np.float)
-            feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch}
+            feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch, self.selected_mastery_index:selected_mastery_index }
             loss_, pred_ = self.sess.run([self.loss, self.pred], feed_dict=feed_dict)
             # Get right answer index
             # Make [batch size * seq_len, 1]
 
+            pred_ = pred_[:,selected_mastery_index+1:-1] 
+            target_batch = target_batch[:,selected_mastery_index+1:-1]
+            
             if s == 0:
                 pred_list_2d = pred_ 
                 target_list_2d = target_batch 
