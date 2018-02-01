@@ -307,13 +307,14 @@ class DKVMNModel():
             bar = ProgressBar(label, max=training_step)
 
         self.train_count = 0
-        if self.args.init_from:
-            if self.load():
-                print('Checkpoint exists')
-                #print('Checkpoint exists and skip training')
-                #return 
-            else:
-                print('No checkpoint')
+        #if self.args.init_from:
+        if self.load():
+            print('Checkpoint exists')
+            #print('Checkpoint exists and skip training')
+            #return 
+        else:
+            print('No checkpoint')
+        '''
         else:
             if os.path.exists(os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)):
                 try:
@@ -321,6 +322,7 @@ class DKVMNModel():
                     shutil.rmtree(os.path.join(self.args.dkvmn_log_dir, self.model_dir+'.csv'))
                 except(FileNotFoundError, IOError) as e:
                     print('[Delete Error] %s - %s' % (e.filename, e.strerror))
+        '''
         
         best_valid_auc = 0
         early_stop_counter = 0
@@ -425,6 +427,7 @@ class DKVMNModel():
                 best_valid_auc = valid_auc
                 best_epoch = epoch + 1
                 self.save(best_epoch, checkpoint_dir)
+                early_stop_counter = 0
             else:
                 early_stop_counter += 1 
 
@@ -500,7 +503,7 @@ class DKVMNModel():
         self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
         
-        log_file_name = '{}_test_result.txt'.format(self.args.dataset)
+        log_file_name = '{}_{}_test_result.txt'.format(self.args.prefix, self.args.dataset)
         log_file_path = os.path.join(self.args.dkvmn_test_result_dir, log_file_name)
         log_file = open(log_file_path, 'a')
         log = 'Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy)
