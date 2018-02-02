@@ -290,7 +290,7 @@ class DKVMNModel():
             print(i.name)
             print(i.shape)
 
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(max_to_keep=1000)
         print('Finish init_model')
 
 
@@ -535,7 +535,7 @@ class DKVMNModel():
         log_file.write(log + '\n') 
         log_file.flush()    
 
-        return pred_list_2d, target_list_2d
+        return pred_list_2d, target_list_2d, test_auc, test_accuracy
         
 
     def clustering_actions(self):
