@@ -14,7 +14,6 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
 
-
 class DKVMNModel():
     def __init__(self, args, sess, name='KT'):
 
@@ -23,12 +22,19 @@ class DKVMNModel():
         self.sess = sess
 
         #tf.set_random_seed(224)
+        #self.logger = self.set_logger()
+        self.logger = dkvmn_utils.set_logger('DKVMN', 'dkvmn.log')
+        self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
+
+        self.logger.info('#'*120)
+        self.logger.info(self.model_dir)
 
         self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
         
         self.init_model()
         self.init_total_prediction_probability()
         self.init_mastery_level()
+
 
     def inference_with_counter(self, q_embed, correlation_weight, value_matrix, reuse_flag, counter):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
@@ -507,8 +513,13 @@ class DKVMNModel():
         all_q = np.concatenate(q_list, axis=0)
 
         test_auc, test_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
+        count, metric_for_each_q = dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
+        #print(metric_for_each_q)
+        for (idx, metric) in enumerate(metric_for_each_q):
+            self.logger.info('{:<3d}: {:>7d}, {: .4f}, {: .4f}'.format(idx+1, count[idx], metric[0], metric[1]))
+            
 
-        print('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
+        self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
         self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
         log_file_name = '{}_{}_test_result.txt'.format(self.args.prefix, self.args.dataset)

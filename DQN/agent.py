@@ -9,7 +9,7 @@ from dqn import *
 from environment import *
 from replay_memory import *
 
-import logging 
+import dkvmn_utils 
 
 class DKVMNAgent():
     def __init__(self, args, sess, dkvmn):
@@ -17,7 +17,7 @@ class DKVMNAgent():
         self.args = args
         self.sess = sess
 
-        self.logger = self.set_logger() 
+        self.logger = dkvmn_utils.set_logger('DQN', 'policy.log') 
         self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
 #
         self.logger.debug('Initializing AGENT')
@@ -50,6 +50,7 @@ class DKVMNAgent():
     #def process_state(self, next_state):
         #self.state = next_state
 
+    '''
     def set_logger(self):
         logger = logging.getLogger('DQN')
 
@@ -67,6 +68,7 @@ class DKVMNAgent():
         logger.addHandler(fileHandler)
 
         return logger
+    '''
 
 
     def train(self):

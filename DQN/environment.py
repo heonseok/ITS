@@ -4,7 +4,6 @@ import numpy as np
 import random
 import copy
 
-import logging
 
 class DKVMNEnvironment():
     def __init__(self, args, sess, dkvmn, logger):

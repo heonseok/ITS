@@ -26,7 +26,7 @@ class ClusteredDKVMN():
         
         self.selected_mastery_index = self.args.target_mastery_index - 1 
 
-        self.logger = self.set_logger()
+        self.logger = dkvmn_utils.set_logger('cDKVMN', 'clustered_dkvmn.log')
         self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
 
         self.logger.debug('Initializing Clustered DKVMN')
@@ -41,26 +41,6 @@ class ClusteredDKVMN():
 
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
-
-
-    def set_logger(self):
-        logger = logging.getLogger('cDKVMN')
-
-        streamFormatter = logging.Formatter('[%(levelname)s] %(message)s')
-        streamHandler = logging.StreamHandler()
-        streamHandler.setFormatter(streamFormatter)
-        streamHandler.setLevel(logging.DEBUG)
-
-        fileFormatter = logging.Formatter('%(message)s')
-        fileHandler = logging.FileHandler('./clustred_dkvmn.log')
-        fileHandler.setFormatter(fileFormatter)
-        fileHandler.setLevel(logging.INFO)
-
-        logger.addHandler(streamHandler)
-        logger.addHandler(fileHandler)
-
-        return logger
-        
 
     def clustering_exists(self):
         return os.path.exists(self.kmeans_path) 
