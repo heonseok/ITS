@@ -135,7 +135,7 @@ if __name__ == "__main__":
     #file_name_list = ['synthetic']
     #n_questions_list = [50]
 
-    target_file_list = ['train1_test', 'train_test', 'data'] 
+    target_file_list = ['data'] 
     #target_file_list = ['train1', 'train', 'train_total', 'test'] 
     #path = 'data/assist2009_updated/assist2009_updated_train_total'
     #path = 'data/assist2009_updated/assist2009_updated_train_toy'

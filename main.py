@@ -8,6 +8,7 @@ sys.path.append('DQN')
 from agent import *
 from model import *
 from clusteredDKVMN import *
+from dkvmn_analysis import *
 from data_loader import *
 
 from sklearn.model_selection import train_test_split 
@@ -101,6 +102,8 @@ def main():
         '''
 
         parser.add_argument('--dkvmn_test_result_dir', type=str, default='dkvmn_test_result')
+
+        parser.add_argument('--dkvmn_analysis', type=str2bool, default='f')
 
         ########## Modified DKVMN ##########
         parser.add_argument('--knowledge_growth', type=str, choices=['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'], default='value_matrix')
@@ -249,8 +252,8 @@ def main():
                 dkvmn.clustering_actions()
 
 
-            cDKVMN = ClusteredDKVMN(myArgs, sess, myArgs.k, dkvmn)
             if myArgs.clustered_dkvmn_train:
+                cDKVMN = ClusteredDKVMN(myArgs, sess, dkvmn)
                 train_data = np.load(train_data_path)
                 train_q_data = train_data['q']
                 train_qa_data = train_data['qa']
@@ -267,11 +270,19 @@ def main():
                 cDKVMN.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data, test_q_data, test_qa_data)
 
             if myArgs.clustered_dkvmn_test:
+                cDKVMN = ClusteredDKVMN(myArgs, sess, dkvmn)
                 test_data = np.load(test_data_path)
                 test_q_data = test_data['q']
                 test_qa_data = test_data['qa']
 
                 cDKVMN.test(test_q_data, test_qa_data)
+
+            if myArgs.dkvmn_analysis == True:
+                myArgs.batch_size = 1
+                myArgs.seq_len = 1
+                aDKVMN = DKVMNAnalyzer(myArgs, sess, dkvmn)
+                aDKVMN.test1()
+
     
             if myArgs.dkvmn_ideal_test:
                 myArgs.batch_size = 1

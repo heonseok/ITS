@@ -4,13 +4,15 @@ import numpy as np
 import random
 import copy
 
+import logging
+
 class DKVMNEnvironment():
     def __init__(self, args, sess, dkvmn, logger):
         self.args = args
 
         self.logger = logger 
         self.sess = sess
-        self.logger.info('Initializing ENVIRONMENT')
+        self.logger.debug('Initializing ENVIRONMENT')
         self.env = dkvmn 
 
         self.num_actions = self.args.n_questions
@@ -48,7 +50,7 @@ class DKVMNEnvironment():
 
         answer = np.expand_dims(np.expand_dims(1, axis=0), axis=0)
 
-        self.logger.debug('Prob valdiff readdiff sumdiff probdiff masterydiff')
+        #self.logger.debug('Prob valdiff readdiff sumdiff probdiff masterydiff')
         for action_index in range(self.num_actions):
             action = np.asarray(action_index+1, dtype=np.int32)
             action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
@@ -58,7 +60,7 @@ class DKVMNEnvironment():
             mastery_level = self.get_mastery_level()
             mastery_diff = np.sum(mastery_level[0]-prev_mastery_level[0])
 
-            self.logger.debug('{: .4f} {: .4f} {: .4f} {: .4f} {: .4f} {: .4f}'.format(probs[action_index], val_diff, read_diff, summary_diff, prob_diff, mastery_diff)) 
+            #self.logger.debug('{: .4f} {: .4f} {: .4f} {: .4f} {: .4f} {: .4f}'.format(probs[action_index], val_diff, read_diff, summary_diff, prob_diff, mastery_diff)) 
             
 
     def new_episode(self):
@@ -70,9 +72,15 @@ class DKVMNEnvironment():
         final_mastery_level = self.get_mastery_level()
 
         final_values_probs = self.get_prediction_probability()
+
+        pos_terminal_num = np.sum(final_values_probs > self.args.terminal_threshold)
+        neg_terminal_num = np.sum(final_values_probs < 0.4)
+        non_terminal_num = self.num_actions - (pos_terminal_num + neg_terminal_num)
+
+
         final_value_matrix = self.value_matrix
 
-        self.logger.debug('Final env status')
+        #self.logger.debug('Final env status')
         self.env_status()
 
         ##### init variables #####
@@ -84,7 +92,7 @@ class DKVMNEnvironment():
         starting_values_probs = self.get_prediction_probability()
         starting_mastery_level = self.get_mastery_level()
  
-        self.logger.debug('Starting env status')
+        #self.logger.debug('Starting env status')
         self.env_status()
 
         ###### count pos/neg #####
@@ -109,13 +117,14 @@ class DKVMNEnvironment():
         prob_log = 'Prob f: %.4f, d: %.4f' % (final_prob_avg, final_prob_avg - starting_prob_avg)
 
         ##### logging #####
-        self.logger.info('NEW EPISODE Access: %d, Corret count: %d rate: %f, %s %s %s %s Action count: %d' % (access, net_correct_count, net_correct_rate, mastery_log, mastery_count_log, prob_log, prob_count_log, self.action_count))
+        self.logger.debug('NEW EPISODE Access: %d, Corret count: %d rate: %f, %s %s %s %s Action count: %d' % (access, net_correct_count, net_correct_rate, mastery_log, mastery_count_log, prob_log, prob_count_log, self.action_count))
 
         self.action_count = 0
         
-        return access, net_correct_count, net_correct_rate
-
+        return access, net_correct_count, net_correct_rate, pos_terminal_num, neg_terminal_num, non_terminal_num    
+    
     def get_mask(self):
+
         if self.args.terminal_condition == 'prob':
             target = self.get_prediction_probability()
         elif self.args.terminal_condition == 'mastery':
@@ -125,12 +134,77 @@ class DKVMNEnvironment():
         return target_index 
         #return target_index * self.net_correct_arr
 
-    def check_terminal(self):
+    def check_terminal_(self):
         mask = self.get_mask()
         if np.prod(mask) == 1:
             return True
         else: 
             return False
+
+    def check_terminal(self):
+    #def check_terminal_when_to_stop(self):
+        target = self.get_prediction_probability()
+        target_index_under = target < self.args.terminal_threshold
+        target_index_over = target > 0.4  
+
+        target_index = target_index_under * target_index_over
+
+        if target[target_index].size == 0:
+            return True
+        else:
+            return False
+
+
+    def check_when_to_stop(self):
+        prev_probs = self.get_prediction_probability()
+        flags = np.zeros(shape=prev_probs.shape)
+
+        # positive case 
+        pos_stepped_probs = np.empty(shape=prev_probs.shape) 
+        answer = np.asarray(1, dtype=np.int32)
+        answer = np.expand_dims(np.expand_dims(answer, axis=0), axis=0)
+
+        for action_idx in range(self.num_actions):
+            action = np.asarray(action_idx+1, dtype=np.int32)
+            action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
+
+            ops = [self.env.stepped_pred_prob]
+            pos_stepped_probs[action_idx] = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})[0]
+
+        pos_eps_idx = np.absolute(pos_stepped_probs-prev_probs) < 0.01 
+        pos_terminal_idx = pos_stepped_probs[pos_eps_idx] > self.args.terminal_threshold
+
+        #pos_prev_probs_idx = prev_probs > self.args.terminal_threshold
+        #pos_terminal_idx = np.absolute(pos_stepped_probs[pos_prev_pros_idx]) < 0.01 
+
+        # negative case 
+        neg_stepped_probs = np.empty(shape=prev_probs.shape) 
+        answer = np.asarray(0, dtype=np.int32)
+        answer = np.expand_dims(np.expand_dims(answer, axis=0), axis=0)
+
+        for action_idx in range(self.num_actions):
+            action = np.asarray(action_idx+1, dtype=np.int32)
+            action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
+
+            ops = [self.env.stepped_pred_prob]
+            neg_stepped_probs[action_idx] = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})[0]
+
+        #neg_prev_probs_idx = prev_probs < self.args.terminal_threshold
+        neg_eps_idx = np.absolute(neg_stepped_probs-prev_probs) < 0.01 
+        neg_terminal_idx = neg_stepped_probs[neg_eps_idx] < 1-self.args.terminal_threshold 
+
+        #neg_prev_probs_idx = prev_probs < 0.4
+        #neg_terminal_idx = np.absolute(neg_stepped_probs[neg_prev_pros_idx]) < 0.01 
+
+        neutral_terminal_idx = pos_eps_idx * neg_eps_idx 
+
+        terminal_count = np.sum(pos_terminal_idx) + np.sum(neg_terminal_idx) + np.sum(neutral_terminal_idx)
+        if terminal_count == self.num_actions:
+            return True
+        else:
+            return False
+
+
 
     def mask_actions(self, values):
         mask = self.get_mask()
@@ -198,16 +272,17 @@ class DKVMNEnvironment():
 
         self.episode_step += 1
 
-        self.logger.debug('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
+        #self.logger.debug('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
 
         if self.episode_step == self.args.episode_maxstep:
             terminal = True
-        elif self.check_terminal() == True:
+        elif self.check_when_to_stop() == True:
+        #elif self.check_terminal() == True:
             terminal = True
         else:
             terminal = False
 
-        return np.squeeze(self.state), self.reward, terminal, mastery_level
+        return np.squeeze(self.state), self.reward, terminal, mastery_level, self.get_prediction_probability()
 
     def random_action(self):
         while True:

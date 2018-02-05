@@ -1,8 +1,7 @@
 import os 
 
-# 'origin', 'value_matrix', 'read_content', 'summary', 'pred_prob'
+# 'origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'
 knowledge_growth_list = ['origin']
-#knowledge_growth_list = ['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery']
 
 # 'sigmoid', 'tanh', 'relu'
 add_signal_activation_list = ['tanh']
@@ -26,7 +25,7 @@ state_type_list = ['mastery']
 reward_type_list = ['mastery'] 
 #'value', 'read', 'summary', 'prob', 'mastery'
 
-policy_type_list = ['random']
+policy_type_list = ['prob_max', 'random', 'prob_max']
 #'dqn', 'random', 'prob_max'
 
 for knowledge_growth in knowledge_growth_list:
@@ -42,10 +41,11 @@ for knowledge_growth in knowledge_growth_list:
                                     args_list = []
                                     args_list.append('python main.py')
 
-                                    args_list.append('--prefix MS10_')
+                                    args_list.append('--prefix lrModified_MS10_')
 
-                                    args_list.append('--dkvmn_train t --dkvmn_test t --dkvmn_ideal_test f --dqn_train f --dqn_test f')
-                                    args_list.append('--dkvmn_clustering_actions t')
+                                    args_list.append('--dkvmn_train f --dkvmn_test t --dkvmn_ideal_test f --dqn_train t --dqn_test t')
+                                    args_list.append('--dkvmn_analysis t')
+                                    args_list.append('--dkvmn_clustering_actions f')
 
                                     args_list.append('--gpu_id 0')
                                     args_list.append('--logging_level INFO')

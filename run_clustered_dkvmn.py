@@ -29,6 +29,11 @@ reward_type_list = ['mastery']
 policy_type_list = ['random']
 #'dqn', 'random', 'prob_max'
 
+#k_list = [2]
+k_list = [2,3,4,5,6,7,8,9,10]
+mastery_idx_list = [10]
+
+
 for knowledge_growth in knowledge_growth_list:
     for add_signal_activation in add_signal_activation_list:
         for erase_signal_activation in erase_signal_activation_list:
@@ -38,52 +43,58 @@ for knowledge_growth in knowledge_growth_list:
                         for state_type in state_type_list:
                             for reward_type in reward_type_list:
                                 for policy_type in policy_type_list:
+                                    for k in k_list:
+                                        for mastery_idx in mastery_idx_list:
 
-                                    args_list = []
-                                    args_list.append('python main.py')
+                                            args_list = []
+                                            args_list.append('python main.py')
 
-                                    args_list.append('--prefix lrModified_MS10_')
+                                            args_list.append('--prefix nonloss_valid_lr_MS10_')
 
-                                    args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train f --dqn_test f')
-                                    args_list.append('--dkvmn_clustering_actions f')
+                                            args_list.append('--dkvmn_train f --dkvmn_test t --dkvmn_ideal_test f --dqn_train f --dqn_test f')
+                                            args_list.append('--dkvmn_clustering_actions f')
 
-                                    args_list.append('--k 4')
-                                    args_list.append('--clustered_dkvmn_train t')
-                                    args_list.append('--clustered_dkvmn_test t')
+                                            args_list.append('--clustered_dkvmn_train t')
+                                            args_list.append('--clustered_dkvmn_test t')
 
-                                    args_list.append('--gpu_id 0')
-                                    args_list.append('--logging_level DEBUG')
+                                            args_list.append('--k')
+                                            args_list.append(str(k))
+                                            args_list.append('--target_mastery_index')
+                                            args_list.append(str(mastery_idx))
 
-                                    args_list.append('--test_policy_type')
-                                    args_list.append(policy_type)
+                                            args_list.append('--gpu_id 0')
+                                            args_list.append('--logging_level DEBUG')
 
-                                    args_list.append('--dataset assist2009_updated')
-                                    #args_list.append('--dataset synthetic')
+                                            args_list.append('--test_policy_type')
+                                            args_list.append(policy_type)
 
-                                    args_list.append('--knowledge_growth')
-                                    args_list.append(knowledge_growth)
+                                            args_list.append('--dataset assist2009_updated')
+                                            #args_list.append('--dataset synthetic')
 
-                                    args_list.append('--summary_activation')
-                                    args_list.append(summary_activation)
+                                            args_list.append('--knowledge_growth')
+                                            args_list.append(knowledge_growth)
 
-                                    args_list.append('--add_signal_activation')
-                                    args_list.append(add_signal_activation)
+                                            args_list.append('--summary_activation')
+                                            args_list.append(summary_activation)
 
-                                    args_list.append('--erase_signal_activation')
-                                    args_list.append(erase_signal_activation)
+                                            args_list.append('--add_signal_activation')
+                                            args_list.append(add_signal_activation)
 
-                                    args_list.append('--write_type')
-                                    args_list.append(write_type)
+                                            args_list.append('--erase_signal_activation')
+                                            args_list.append(erase_signal_activation)
 
-                                    args_list.append('--initial_lr')
-                                    args_list.append(str(learning_rate))
+                                            args_list.append('--write_type')
+                                            args_list.append(write_type)
 
-                                    args_list.append('--state_type')
-                                    args_list.append(state_type)
+                                            args_list.append('--initial_lr')
+                                            args_list.append(str(learning_rate))
 
-                                    args_list.append('--reward_type')
-                                    args_list.append(reward_type)
+                                            args_list.append('--state_type')
+                                            args_list.append(state_type)
 
-                                    model = ' '.join(args_list)
-                                    print(model)
-                                    os.system(model)
+                                            args_list.append('--reward_type')
+                                            args_list.append(reward_type)
+
+                                            model = ' '.join(args_list)
+                                            print(model)
+                                            os.system(model)

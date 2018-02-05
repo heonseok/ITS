@@ -582,7 +582,7 @@ class DKVMNModel():
         _, _, _, pred_prob = self.inference(q_embed, correlation_weight, value_matrix, reuse_flag = True)
 
         # TODO : arguemnt check for various algorithms
-        #pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
+        pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
 
         threshold = tf.random_uniform(pred_prob.shape)
 

@@ -17,21 +17,13 @@ class DKVMNAgent():
         self.args = args
         self.sess = sess
 
-        self.logger = logging.getLogger('DQN')
-        
-        self.logger.setLevel(eval('logging.%s'%self.args.logging_level))
-
-        ch = logging.StreamHandler()
-        formatter = logging.Formatter('[%(levelname)s] %(message)s')
-        #formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] [%(message)s]')
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
-
-        self.logger.info('Initializing AGENT')
+        self.logger = self.set_logger() 
+        self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
+#
+        self.logger.debug('Initializing AGENT')
 
         self.env = DKVMNEnvironment(args, sess, dkvmn, self.logger)
         self.memory = DKVMNMemory(args, self.env.state_shape)
-        #super(DKVMNAgent, self).__init__(args, sess)
 
         self.dqn = DQN(self.args, self.sess, self.memory, self.env)
 
@@ -50,26 +42,48 @@ class DKVMNAgent():
 
         self.dqn.update_target_network()
 
-        self.prev_q = 0
+        self.logger.info('#'*120)
+        self.logger.info(dkvmn.model_dir)
+        self.logger.info('{:<20s}: {}'.format('Policy type', self.args.test_policy_type))
+
 
     #def process_state(self, next_state):
         #self.state = next_state
 
+    def set_logger(self):
+        logger = logging.getLogger('DQN')
+
+        streamFormatter = logging.Formatter('[%(levelname)s] %(message)s')
+        streamHandler = logging.StreamHandler()
+        streamHandler.setFormatter(streamFormatter)
+        streamHandler.setLevel(logging.DEBUG)
+
+        fileFormatter = logging.Formatter('%(message)s')
+        fileHandler = logging.FileHandler('./policy.log')
+        fileHandler.setFormatter(fileFormatter)
+        fileHandler.setLevel(logging.INFO)
+
+        logger.addHandler(streamHandler)
+        logger.addHandler(fileHandler)
+
+        return logger
+
+
     def train(self):
-        self.logger.info('Agent is training')
+        self.logger.debug('Agent is training')
         self.episode_count = 0
         best_reward = 0
         self.episode_reward = 0
         action_count = 0 
         episode_rewards = []
 
-        self.logger.info('===== Start to make random memory =====')
+        self.logger.debug('===== Start to make random memory =====')
         self.reset_episode()
         for self.step in tqdm(range(1, self.args.max_step+1), ncols=70, initial=0):
             action = self.select_action()
             action_count += 1
 
-            next_state, reward, terminal, mastery_lelvel = self.env.act(action)
+            next_state, reward, terminal, mastery_lelvel, pred_prob = self.env.act(action)
             self.memory.add(action, reward, terminal, next_state)
 
             #self.tb_logger.log_scalar(tag='Episode%d:action'%self.episode_count, value=action, step=action_count)
@@ -88,7 +102,7 @@ class DKVMNAgent():
 
             if self.step >= self.args.training_start_step:
                 if self.step == self.args.training_start_step:
-                    self.logger.info("===== Start to update the network =====")
+                    self.logger.debug("===== Start to update the network =====")
 
                 if self.step % self.args.train_interval == 0:
                     loss, _ = self.dqn.train_network()
@@ -105,7 +119,7 @@ class DKVMNAgent():
                     min_r = np.min(episode_rewards)
                     if max_r > best_reward:
                         best_reward = max_r
-                    self.logger.debug('\n[recent %d episodes] avg_r: %.4f, max_r: %d, min_r: %d // Best: %d' % (len(episode_rewards), avg_r, max_r, min_r, best_reward))
+                    #self.logger.debug('\n[recent %d episodes] avg_r: %.4f, max_r: %d, min_r: %d // Best: %d' % (len(episode_rewards), avg_r, max_r, min_r, best_reward))
                     episode_rewards = []
     
 
@@ -135,6 +149,10 @@ class DKVMNAgent():
         episode_correct_count = []
         episode_correct_rate = []
 
+        episode_pos_terminal = list()
+        episode_neg_terminal = list()
+        episode_non_terminal = list()
+
         self.reset_episode()
         for episode in range(self.args.num_test_episode):
             current_reward = 0
@@ -144,17 +162,23 @@ class DKVMNAgent():
                 action = self.select_action()
                 action_count += 1
                 #self.tb_logger.log_scalar(tag='Episode%d:action'%episode, value=action, step=action_count)
-                next_state, reward, terminal, mastery_level = self.env.act(action)
+                next_state, reward, terminal, mastery_level, pred_prob = self.env.act(action)
                 #self.tb_logger.log_scalar(tag='Episode%d:reward'%episode, value=reward, step=action_count)
                 self.tb_logger.log_scalar(tag='Episode%d:mastery'%episode, value=np.sum(mastery_level), step=action_count)
 
                 current_reward += reward
                 if terminal:
                     action_count_list.append(action_count)
-                    access, correct_count, correct_rate = self.reset_episode()
+                    access, correct_count, correct_rate, pos_terminal, neg_terminal, non_terminal = self.reset_episode()
                     episode_access.append(access)
                     episode_correct_count.append(correct_count)
                     episode_correct_rate.append(correct_rate)
+
+                    episode_pos_terminal.append(pos_terminal)
+                    episode_neg_terminal.append(neg_terminal)
+                    episode_non_terminal.append(non_terminal)
+
+                    #print(pred_prob)
 
                     action_count = 0
                     break
@@ -165,22 +189,42 @@ class DKVMNAgent():
             #self.logger.info('<%d> Current episode reward: %f' % (episode, current_reward))
             #self.logger.info('Best episode reward: %f' % (best_reward))
 
-        print(action_count_list) 
+        #print(action_count_list) 
         action_count_avg = np.average(np.array(action_count_list))
         access_avg = np.average(np.array(episode_access))
         correct_count_avg = np.average(np.array(episode_correct_count))
         correct_rate_avg = np.average(np.array(episode_correct_rate))
-        result = '%s policy, average number of access: %f, correct_count: %f, correct_rate: %f, actions: %f' % (self.args.test_policy_type, access_avg, correct_count_avg, correct_rate_avg, action_count_avg)
-        self.logger.info(result)
 
+        pos_terminal_avg = np.average(episode_pos_terminal)
+        neg_terminal_avg = np.average(episode_neg_terminal)
+        non_terminal_avg = np.average(episode_non_terminal)
+
+        self.logger.info('{:<20s}: {:>.2f}'.format('Access avg', access_avg))
+        self.logger.info('{:<20s}: {:>.2f}'.format('Correct count avg', correct_count_avg))
+        self.logger.info('{:<20s}: {:>.2f}'.format('Correct rate avg', correct_rate_avg))
+        self.logger.info('{:<20s}: {:>.2f}'.format('Action count avg', action_count_avg))
+        self.logger.info('{:<20s}: {:>.2f}'.format('Pos terminal avg', pos_terminal_avg))
+        self.logger.info('{:<20s}: {:>.2f}'.format('Neg terminal avg', neg_terminal_avg))
+        self.logger.info('{:<20s}: {:>.2f}'.format('Non terminal avg', non_terminal_avg))
+
+        self.logger.info('\n')
+
+        # print probability info
+
+
+        #result = '%s policy, average number of access: %f, correct_count: %f, correct_rate: %f, actions: %f' % (self.args.test_policy_type, access_avg, correct_count_avg, correct_rate_avg, action_count_avg)
+        #self.logger.info(result)
+
+
+        '''
         log_file_name = '{}_test_result.txt'.format(self.args.dataset)
         log_file_path = os.path.join(self.args.dqn_test_result_dir, log_file_name)
         log_file = open(log_file_path, 'a')
         log_file.write('\n' + self.model_dir + '\n')
         log_file.write(result + '\n')
         log_file.flush()
+        '''
 
-        #return result
 
     def select_action(self):
         if self.args.dqn_train:
@@ -222,28 +266,24 @@ class DKVMNAgent():
         if not os.path.exists(checkpoint_dir):
             os.mkdir(checkpoint_dir)
         self.saver.save(self.sess, os.path.join(checkpoint_dir, str(self.step)))
-        self.logger.info('*** Save at %d steps' % self.step)
+        self.logger.debug('*** Save at %d steps' % self.step)
 
     def load(self):
-        self.logger.info('Loading DQN checkpoint ...')
+        self.logger.debug('Loading DQN checkpoint ...')
         checkpoint_dir = os.path.join(self.args.dqn_checkpoint_dir, self.model_dir)
         checkpoint_state = tf.train.get_checkpoint_state(checkpoint_dir)
         if checkpoint_state and checkpoint_state.model_checkpoint_path:
             checkpoint_model = os.path.basename(checkpoint_state.model_checkpoint_path)
             self.saver.restore(self.sess, checkpoint_state.model_checkpoint_path)
-            self.logger.info('Success to load %s' % checkpoint_model)
+            self.logger.debug('Success to load %s' % checkpoint_model)
             return True
         else:
-            self.logger.info('Faile to find a checkpoint')
+            self.logger.info('Fail to find a checkpoint')
             return False
 
     def reset_episode(self):
-        #access, correct_count, correct_rate = self.env.new_episode()
-        #self.write_log(self.episode_count, self.episode_reward)
         self.env.episode_step = 0
-        #print('Episode rewards :%3.4f' % self.episode_reward)
         self.episode_reward = 0
 
-        #return access, correct, correct_rate 
         return self.env.new_episode()
 
