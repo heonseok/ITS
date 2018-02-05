@@ -4,7 +4,10 @@ import tensorflow as tf
 import operations
 import shutil
 from memory import DKVMN
-from sklearn import metrics
+#rom sklearn.metrics import roc_auc_score
+#from sklearn.metrics import accuracy_score
+
+import dkvmn_utils
 
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
@@ -391,18 +394,11 @@ class DKVMNModel():
             all_pred = np.concatenate(pred_list, axis=0)
             all_target = np.concatenate(target_list, axis=0)
 
-            # Compute metrics
-            self.auc = metrics.roc_auc_score(all_target, all_pred)
-            # Extract elements with boolean index
-            # Make '1' for elements higher than 0.5
-            # Make '0' for elements lower than 0.5
-            all_pred[all_pred > 0.5] = 1.0
-            all_pred[all_pred <= 0.5] = 0.0
-            self.accuracy = metrics.accuracy_score(all_target, all_pred)
 
+            train_auc, train_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
             epoch_loss = epoch_loss / training_step    
-            print('Epoch %d/%d, loss : %3.5f, auc : %3.5f, accuracy : %3.5f' % (epoch+1, self.args.num_epochs, epoch_loss, self.auc, self.accuracy))
-            self.write_log(epoch=epoch+1, auc=self.auc, accuracy=self.accuracy, loss=epoch_loss, name='training_')
+            print('Epoch %d/%d, loss : %3.5f, auc : %3.5f, accuracy : %3.5f' % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy))
+            self.write_log(epoch=epoch+1, auc=train_auc, accuracy=train_accuracy, loss=epoch_loss, name='training_')
 
             valid_steps = valid_q_data.shape[0] // self.args.batch_size
             valid_pred_list = list()
@@ -430,11 +426,7 @@ class DKVMNModel():
             all_valid_pred = np.concatenate(valid_pred_list, axis=0)
             all_valid_target = np.concatenate(valid_target_list, axis=0)
 
-            valid_auc = metrics.roc_auc_score(all_valid_target, all_valid_pred)
-             # For validation accuracy
-            all_valid_pred[all_valid_pred > 0.5] = 1.0
-            all_valid_pred[all_valid_pred <= 0.5] = 0.0
-            valid_accuracy = metrics.accuracy_score(all_valid_target, all_valid_pred)
+            vliad_auc, valid_accuracy = dkvmn_utils.calculate_metric(all_valid_target, all_valid_pred)
             print('Epoch %d/%d, valid auc : %3.5f, valid accuracy : %3.5f' %(epoch+1, self.args.num_epochs, valid_auc, valid_accuracy))
             # Valid log
             self.write_log(epoch=epoch+1, auc=valid_auc, accuracy=valid_accuracy, loss=valid_loss, name='valid_')
@@ -468,6 +460,7 @@ class DKVMNModel():
         #pred_list_2d = list()
         target_list = list()
         #target_list_2d = list()
+        q_list = list()
 
         for s in range(steps):
             test_q_batch = test_q[s*self.args.batch_size:(s+1)*self.args.batch_size, :]
@@ -483,6 +476,7 @@ class DKVMNModel():
 
             pred_ = pred_[:,selected_mastery_index+1:] 
             target_batch = target_batch[:,selected_mastery_index+1:]
+            q_ = test_q_batch[:,selected_mastery_index+1:]
             
             if s == 0:
                 pred_list_2d = pred_ 
@@ -493,35 +487,30 @@ class DKVMNModel():
 
             target_reshaped = np.asarray(target_batch).reshape(-1,1)
             pred_reshaped = np.asarray(pred_).reshape(-1,1)
+            q_reshaped = np.asarray(q_).reshape(-1,1)
             # np.flatnonzero returns indices which is nonzero, convert it list 
             right_index = np.flatnonzero(target_reshaped != -1.).tolist()
             # Number of 'training_step' elements list with [batch size * seq_len, ]
             
             right_pred = pred_reshaped[right_index]
             right_target = target_reshaped[right_index]
+            right_q = q_reshaped[right_index]
 
             pred_list.append(right_pred)
             target_list.append(right_target)
+            q_list.append(right_q)
             
             
 
         all_pred = np.concatenate(pred_list, axis=0)
         all_target = np.concatenate(target_list, axis=0)
+        all_q = np.concatenate(q_list, axis=0)
 
-        test_auc = metrics.roc_auc_score(all_target, all_pred)
-        # Compute metrics
-        all_pred[all_pred > 0.5] = 1.0
-        all_pred[all_pred <= 0.5] = 0.0
-        # Extract elements with boolean index
-        # Make '1' for elements higher than 0.5
-        # Make '0' for elements lower than 0.5
-
-        test_accuracy = metrics.accuracy_score(all_target, all_pred)
+        test_auc, test_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
 
         print('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
         self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
-        
         log_file_name = '{}_{}_test_result.txt'.format(self.args.prefix, self.args.dataset)
         log_file_path = os.path.join(self.args.dkvmn_test_result_dir, log_file_name)
         log_file = open(log_file_path, 'a')
@@ -537,6 +526,7 @@ class DKVMNModel():
 
         return pred_list_2d, target_list_2d, test_auc, test_accuracy
         
+
 
     def clustering_actions(self):
         if self.load():

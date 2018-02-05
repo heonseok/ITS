@@ -5,8 +5,10 @@ import tensorflow as tf
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import accuracy_score
+#from sklearn.metrics import roc_auc_score
+#from sklearn.metrics import accuracy_score
+
+import dkvmn_utils
 
 import logging
 
@@ -120,8 +122,8 @@ class ClusteredDKVMN():
                 c_total_pred_list = np.concatenate((c_total_pred_list, c_pred_list), axis=0)
                 c_total_target_list = np.concatenate((c_total_target_list, c_target_list), axis=0)
 
-        total_b_auc, total_b_acc = self.calculate_metric(b_total_target_list, b_total_pred_list)
-        total_c_auc, total_c_acc = self.calculate_metric(c_total_target_list, c_total_pred_list)
+        total_b_auc, total_b_acc = dkvmn_utils.calculate_metric(b_total_target_list, b_total_pred_list)
+        total_c_auc, total_c_acc = dkvmn_utils.calculate_metric(c_total_target_list, c_total_pred_list)
 
         self.logger.info(b_auc_string)
         self.logger.info(b_acc_string)
@@ -133,20 +135,6 @@ class ClusteredDKVMN():
 
         self.logger.info('\n')
     
-    def calculate_metric(self, target, pred):
-
-        right_index = (target != -1.)
-
-        right_target = target[right_index]
-        right_pred = pred[right_index]
-
-        auc = roc_auc_score(right_target, right_pred)
-
-        right_pred[right_pred > 0.5] = 1.0
-        right_pred[right_pred <= 0.5] = 0.0
-        acc = accuracy_score(right_target, right_pred)
-
-        return auc, acc 
 
     def get_mastery_level(self, q_data, qa_data):
         self.logger.debug('Get mastery level')
