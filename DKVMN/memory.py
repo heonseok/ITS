@@ -94,8 +94,9 @@ class DKVMN_Memory():
         elif self.args.erase_signal_activation == 'relu':
             return tf.nn.relu(erase_vector)
 
-    def add(self, value_matrix, correlation_weight, knowledge_growth, reuse=False):
-        add_vector = operations.linear(knowledge_growth, self.memory_state_dim, name=self.name+'/Add_Vector', reuse=reuse)
+    def add(self, value_matrix, correlation_weight, knowledge_growth):
+    #def add(self, value_matrix, correlation_weight, knowledge_growth, reuse=False):
+        add_vector = operations.linear(knowledge_growth, self.memory_state_dim, name=self.name+'/Add_Vector')
         add_signal = self.activate_add_signal(add_vector)
         cw_reshaped = tf.reshape(correlation_weight, [-1,self.memory_size,1])
         add_reshaped = tf.reshape(add_signal, [-1, 1, self.memory_state_dim])
@@ -103,8 +104,8 @@ class DKVMN_Memory():
   
         return add_mul
 
-    def erase(self, value_matrix, correlation_weight, knowledge_growth, reuse=False):
-        erase_vector = operations.linear(knowledge_growth, self.memory_state_dim, name=self.name+'/Erase_Vector', reuse=reuse)
+    def erase(self, value_matrix, correlation_weight, knowledge_growth):
+        erase_vector = operations.linear(knowledge_growth, self.memory_state_dim, name=self.name+'/Erase_Vector')
         erase_signal = self.activate_erase_signal(erase_vector)
         erase_reshaped = tf.reshape(erase_signal, [-1,1,self.memory_state_dim])
         cw_reshaped = tf.reshape(correlation_weight, [-1,self.memory_size,1])
@@ -113,13 +114,13 @@ class DKVMN_Memory():
       
         return erase
 
-    def write_given_a(self, value_matrix, correlation_weight, knowledge_growth, a, reuse=False):
+    def write_given_a(self, value_matrix, correlation_weight, knowledge_growth, a):
         '''
             Value matrix : [batch size, memory size, memory state dim(d_k)]
             Correlation weight : [batch size, memory size]
         '''
-        add_mul = self.add(value_matrix, correlation_weight, knowledge_growth, reuse)
-        erase = self.erase(value_matrix, correlation_weight, knowledge_growth, reuse)
+        add_mul = self.add(value_matrix, correlation_weight, knowledge_growth)
+        erase = self.erase(value_matrix, correlation_weight, knowledge_growth)
         
         a_reshaped = tf.reshape(tf.cast(a, tf.float32), [-1, 1, 1])
         ones = tf.ones(tf.shape(a_reshaped))

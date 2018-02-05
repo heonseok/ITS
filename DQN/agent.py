@@ -17,9 +17,7 @@ class DKVMNAgent():
         self.args = args
         self.sess = sess
 
-        self.logger = dkvmn_utils.set_logger('DQN', 'policy.log') 
-        self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
-#
+        self.logger = dkvmn_utils.set_logger('DQN', 'policy.log', self.args.logging_level)
         self.logger.debug('Initializing AGENT')
 
         self.env = DKVMNEnvironment(args, sess, dkvmn, self.logger)
@@ -259,7 +257,8 @@ class DKVMNAgent():
         
     @property
     def model_dir(self):
-        return '{}_State_{}_Reward_{}'.format(self.env.env.model_dir, self.args.state_type, self.args.reward_type)
+        return '{}_Terminal_'.format(self.env.env.model_dir, self.args.terminal_condition_type)
+        #return '{}_State_{}_Reward_{}'.format(self.env.env.model_dir, self.args.state_type, self.args.reward_type)
         #return '{}_{}batch'.format(self.args.env_name, self.args.batch_size_dqn)
             
             

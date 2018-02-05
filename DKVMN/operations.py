@@ -3,11 +3,9 @@ import tensorflow as tf
 import os
 
 # x : input(batch * state_dim)
-def linear(x, state_dim, name='linear', reuse=True):
+def linear(x, state_dim, name='linear'):
     tf.set_random_seed(224)
-    with tf.variable_scope(name) as scope:
-        if reuse:
-            scope.reuse_variables()
+    with tf.variable_scope(name, reuse=tf.AUTO_REUSE) as scope:
 
         weight = tf.get_variable('weight', [x.get_shape()[-1], state_dim], initializer=tf.random_normal_initializer(stddev=0.1))
         #weight = tf.get_variable('weight', [x.get_shape()[-1], state_dim], initializer=tf.truncated_normal_initializer(stddev=0.02))

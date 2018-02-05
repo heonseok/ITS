@@ -133,18 +133,28 @@ class DKVMNEnvironment():
         return target_index 
         #return target_index * self.net_correct_arr
 
-    def check_terminal_(self):
+    def check_terminal(self):
+        condition_type = self.args.terminal_condition_type
+
+        if condition_type == 'pos_mastery':
+            return self.check_pos_mastery()
+        elif condition_type == 'posneg_mastery':
+            return self.check_posneg_mastery()
+        elif condition_type == 'when_to_stop':
+            return self.check_when_to_stop()
+            
+
+    def check_pos_mastery(self):
         mask = self.get_mask()
         if np.prod(mask) == 1:
             return True
         else: 
             return False
 
-    def check_terminal(self):
-    #def check_terminal_when_to_stop(self):
+    def check_posneg_mastery(self):
         target = self.get_prediction_probability()
         target_index_under = target < self.args.terminal_threshold
-        target_index_over = target > 0.4  
+        target_index_over = target > 1 - self.args.terminal_threshold 
 
         target_index = target_index_under * target_index_over
 

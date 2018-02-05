@@ -22,9 +22,7 @@ class DKVMNModel():
         self.sess = sess
 
         #tf.set_random_seed(224)
-        #self.logger = self.set_logger()
-        self.logger = dkvmn_utils.set_logger('DKVMN', 'dkvmn.log')
-        self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
+        self.logger = dkvmn_utils.set_logger('DKVMN', 'dkvmn.log', self.args.logging_level)
 
         self.logger.info('#'*120)
         self.logger.info(self.model_dir)
@@ -40,17 +38,17 @@ class DKVMNModel():
         read_content = self.memory.value.read(value_matrix, correlation_weight)
 
         ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
-        q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
-        q_embed_content = tf.tanh(q_embed_content_logit)
+        #q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
+        #q_embed_content = tf.tanh(q_embed_content_logit)
 
-        counter_content_logit = operations.linear(counter, 20, name='counter_content', reuse=reuse_flag)
+        counter_content_logit = operations.linear(counter, 20, name='counter_content')
         counter_content = tf.sigmoid(counter_content_logit)
 
-        mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content, counter_content], 1)
+        mastery_level_prior_difficulty = tf.concat([read_content, q_embed, counter_content], 1)
         #mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content], 1)
 
         # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=reuse_flag)
+        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Counter_Summary_Vector')
         if self.args.summary_activation == 'tanh':
             summary_vector = tf.tanh(summary_logit)
         elif self.args.summary_activation == 'sigmoid':
@@ -59,7 +57,7 @@ class DKVMNModel():
             summary_vector = tf.nn.relu(summary_logit)
 
         # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=reuse_flag)
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
 
         pred_prob = tf.sigmoid(pred_logits)
 
@@ -76,7 +74,7 @@ class DKVMNModel():
         #mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content], 1)
 
         # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=reuse_flag)
+        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector')
         if self.args.summary_activation == 'tanh':
             summary_vector = tf.tanh(summary_logit)
         elif self.args.summary_activation == 'sigmoid':
@@ -85,7 +83,7 @@ class DKVMNModel():
             summary_vector = tf.nn.relu(summary_logit)
 
         # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=reuse_flag)
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
 
         pred_prob = tf.sigmoid(pred_logits)
 
@@ -117,7 +115,7 @@ class DKVMNModel():
         #print(mastery_level_prior_difficulty.shape)
 
         # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty_reshaped, self.args.final_fc_dim, name='Summary_Vector', reuse=reuse_flag)
+        summary_logit = operations.linear(mastery_level_prior_difficulty_reshaped, self.args.final_fc_dim, name='Summary_Vector')
         if self.args.summary_activation == 'tanh':
             summary_vector = tf.tanh(summary_logit)
         elif self.args.summary_activation == 'sigmoid':
@@ -126,7 +124,7 @@ class DKVMNModel():
             summary_vector = tf.nn.relu(summary_logit)
 
         # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=reuse_flag)
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
 
         pred_logits_reshaped = tf.reshape(pred_logits, shape=[self.args.batch_size, -1])
         #print('HEllow owrld')
@@ -204,6 +202,8 @@ class DKVMNModel():
 
         self.selected_mastery_index = tf.placeholder(tf.int32, name='selected_mastery_index')
 
+        self.using_counter = tf.placeholder(tf.bool)
+
         '''
         self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
         self.qa_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='qa_data')
@@ -224,8 +224,8 @@ class DKVMNModel():
         counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
         #counter = tf.zeros([self.args.batch_size, self.args.n_questions])
 
-        mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
-        mastery_level_list.append(mastery_level)
+        #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
+        #mastery_level_list.append(mastery_level)
 
         # Logics
         for i in range(self.args.seq_len):
@@ -248,14 +248,15 @@ class DKVMNModel():
 
             correlation_weight = self.memory.attention(q_embed)
 
-            #prev_mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, True)
+            mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, True)
                 
+            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = tf.cond(self.using_counter, lambda:self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, tf.AUTO_REUSE, counter), lambda:self.inference(q_embed, correlation_weight, self.memory.memory_value, tf.AUTO_REUSE))
             #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
-            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, True)
+            #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, True)
             prediction.append(prev_pred_logit)
 
             knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, mastery_level)
-            self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a, reuse_flag)
+            self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
             mastery_level = self.calculate_mastery_level(self.memory.memory_value, True)
             mastery_level_list.append(mastery_level)
             
@@ -371,7 +372,7 @@ class DKVMNModel():
                 target_batch = (target - 1) // self.args.n_questions  
                 target_batch = target_batch.astype(np.float)
 
-                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr, self.selected_mastery_index:selected_mastery_index}
+                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr, self.selected_mastery_index:selected_mastery_index, self.using_counter:self.args.using_counter}
                 #loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
                 #loss_, pred_, _, global_norm, grads, _lr = self.sess.run([self.loss, self.pred, self.train_op, self.global_norm, self.grads, self.learning_rate], feed_dict=feed_dict)
                 loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
@@ -416,7 +417,7 @@ class DKVMNModel():
                 # right : 1, wrong : 0, padding : -1
                 valid_target = (valid_qa - 1) // self.args.n_questions
                 valid_target = valid_target.astype(np.float)
-                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target, self.selected_mastery_index:selected_mastery_index}
+                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target, self.selected_mastery_index:selected_mastery_index, self.using_counter:self.args.using_counter}
                 valid_loss, valid_pred = self.sess.run([self.loss, self.pred], feed_dict=valid_feed_dict)
                 # Same with training set
 
@@ -432,7 +433,7 @@ class DKVMNModel():
             all_valid_pred = np.concatenate(valid_pred_list, axis=0)
             all_valid_target = np.concatenate(valid_target_list, axis=0)
 
-            vliad_auc, valid_accuracy = dkvmn_utils.calculate_metric(all_valid_target, all_valid_pred)
+            valid_auc, valid_accuracy = dkvmn_utils.calculate_metric(all_valid_target, all_valid_pred)
             print('Epoch %d/%d, valid auc : %3.5f, valid accuracy : %3.5f' %(epoch+1, self.args.num_epochs, valid_auc, valid_accuracy))
             # Valid log
             self.write_log(epoch=epoch+1, auc=valid_auc, accuracy=valid_accuracy, loss=valid_loss, name='valid_')
@@ -475,7 +476,7 @@ class DKVMNModel():
             target = target.astype(np.int)
             target_batch = (target - 1) // self.args.n_questions  
             target_batch = target_batch.astype(np.float)
-            feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch, self.selected_mastery_index:selected_mastery_index }
+            feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch, self.selected_mastery_index:selected_mastery_index, self.using_counter:self.args.using_counter}
             loss_, pred_ = self.sess.run([self.loss, self.pred], feed_dict=feed_dict)
             # Get right answer index
             # Make [batch size * seq_len, 1]
@@ -665,7 +666,7 @@ class DKVMNModel():
         print(mastery_level_prior_difficulty.shape)
 
         # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=True)
+        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector')
         if self.args.summary_activation == 'tanh':
             summary_vector = tf.tanh(summary_logit)
         elif self.args.summary_activation == 'sigmoid':
@@ -674,7 +675,7 @@ class DKVMNModel():
             summary_vector = tf.nn.relu(summary_logit)
 
         # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=True)
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
 
         self.concept_mastery_level = tf.sigmoid(pred_logits)
 
@@ -753,18 +754,19 @@ class DKVMNModel():
 
     @property
     def model_dir(self):
-        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type)
+        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_Counter_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.using_counter)
  
         if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on':
             network_spec = 'Original'
 
         hyper_parameters = '_lr{}_{}epochs'.format(self.args.initial_lr, self.args.num_epochs)
+        network_detail = '_MemSize{}'.format(self.args.memory_size)
         #hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
         #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
 
         remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
         
-        return self.args.prefix + network_spec + hyper_parameters + remove_short
+        return self.args.prefix + network_spec + network_detail + remove_short
         #return self.args.prefix + network_spec + hyper_parameters + data_postfix
 
         #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.initial_lr, self.args.num_epochs)

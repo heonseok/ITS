@@ -26,9 +26,7 @@ class ClusteredDKVMN():
         
         self.selected_mastery_index = self.args.target_mastery_index - 1 
 
-        self.logger = dkvmn_utils.set_logger('cDKVMN', 'clustered_dkvmn.log')
-        self.logger.setLevel(eval('logging.{}'.format(self.args.logging_level)))
-
+        self.logger = dkvmn_utils.set_logger('cDKVMN', 'clustered_dkvmn.log', self.args.logging_level)
         self.logger.debug('Initializing Clustered DKVMN')
 
         self.checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.baseDKVMN.model_dir, '{}_masteryIdx_{}_clustered'.format(self.selected_mastery_index+1, self.k))

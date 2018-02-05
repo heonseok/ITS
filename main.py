@@ -72,10 +72,10 @@ def main():
         parser.add_argument('--remove_infrequent_skill', type=str2bool, default='f')
         parser.add_argument('--frequency_th', type=int, default=50)
 
-        parser.add_argument('--remove_short_seq', type=str2bool, default='t')
+        parser.add_argument('--remove_short_seq', type=str2bool, default='f')
         parser.add_argument('--short_seq_len_th', type=int, default=20)
 
-        parser.add_argument('--split_data_flag', type=str2bool, default='f')
+        parser.add_argument('--split_data_flag', type=str2bool, default='t')
         
         ########## DKVMN ##########
         parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
@@ -112,6 +112,8 @@ def main():
         parser.add_argument('--summary_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
         
         parser.add_argument('--write_type', type=str, choices=['add_off_erase_off', 'add_off_erase_on', 'add_on_erase_off', 'add_on_erase_on'], default='add_on_erase_on')
+
+        parser.add_argument('--using_counter', type=str2bool, default='f')
 
 
         ########## Clustered DKVMN ##########
@@ -156,6 +158,7 @@ def main():
         parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='value')
         parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='value')
         parser.add_argument('--test_policy_type', type=str, choices=['random', 'dqn', 'prob_max', 'prob_min'], default='dqn')
+        parser.add_argument('--terminal_condition_type', type=str, choices=['pos_mastery', 'posneg_matsery', 'when_to_stop'], default='pos_mastery')
 
         parser.add_argument('--num_test_episode', type=int, default=100)
 

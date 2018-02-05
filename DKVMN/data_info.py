@@ -3,12 +3,15 @@ import os
 
 import matplotlib.pyplot as plt
 
+import dkvmn_utils
 
 class DATA_Analyzer():
-    def __init__(self, path, n_questions, seperate_char):
+    def __init__(self, path, n_questions, seperate_char, logger):
         self.seperate_char = seperate_char
         self.n_questions = n_questions
         self.path = path+'.csv'
+
+        self.logger = logger
 
     def analysis_dataset(self):
         f_data = open(self.path, 'r')
@@ -88,7 +91,7 @@ class DATA_Analyzer():
         histogram = ''
         for idx in range(self.n_questions):
             histogram +=  '{} : {}\n'.format(idx+1, total_access_arr[idx])
-            print('{} : {}'.format(idx+1, total_access_arr[idx]))
+            self.logger.debug('{} : {}'.format(idx+1, total_access_arr[idx]))
 
         total_access_count = str(np.sum(total_access_arr))
         #print('Total number of access : {}'.format(np.sum(total_access_arr)))
@@ -123,6 +126,8 @@ class DATA_Analyzer():
 if __name__ == "__main__":
     seperate_char = ','
 
+    logger = dkvmn_utils.set_logger('dataInfo', 'data_info.log', 'INFO')
+
     dir_name = 'data_information'
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
@@ -148,18 +153,21 @@ if __name__ == "__main__":
 
     for idx, path_prefix in enumerate(path_prefix_list):
         n_questions = n_questions_list[idx] 
-        file_name = file_name_list[idx]
-        file_path = os.path.join(dir_name, file_name)
-        log_file = open(file_path, 'w')
+        #file_name = file_name_list[idx]
+        #file_path = os.path.join(dir_name, file_name)
+        #log_file = open(file_path, 'w')
 
-        log_file.write(header+'\n')
+        #log_file.write(header+'\n')
 
         for target_file in target_file_list:
             path = path_prefix + target_file 
 
-            da = DATA_Analyzer(path, n_questions, seperate_char)
+            da = DATA_Analyzer(path, n_questions, seperate_char, logger)
             histogram, info_list = da.analysis_dataset()
             info = target_file + ',' +  ','.join(info_list)
-            log_file.write(info+'\n') 
-            log_file.write(histogram)
-            log_file.flush()
+            logger.info(header)
+            logger.info(info)
+            logger.info(histogram)
+            #log_file.write(info+'\n') 
+            #log_file.write(histogram)
+            #log_file.flush()
