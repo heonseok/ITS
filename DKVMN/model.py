@@ -34,7 +34,7 @@ class DKVMNModel():
         self.init_mastery_level()
 
 
-    def inference_with_counter(self, q_embed, correlation_weight, value_matrix, reuse_flag, counter):
+    def inference_with_counter(self, q_embed, correlation_weight, value_matrix, counter):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
 
         ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
@@ -63,7 +63,7 @@ class DKVMNModel():
 
         return read_content, summary_vector, pred_logits, pred_prob
 
-    def inference(self, q_embed, correlation_weight, value_matrix, reuse_flag):
+    def inference(self, q_embed, correlation_weight, value_matrix):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
 
         ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
@@ -89,7 +89,7 @@ class DKVMNModel():
 
         return read_content, summary_vector, pred_logits, pred_prob
 
-    def calculate_mastery_level(self, value_matrix, reuse_flag):
+    def calculate_mastery_level(self, value_matrix):
         #self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
         #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
 
@@ -219,7 +219,7 @@ class DKVMNModel():
         
         prediction = list()
         mastery_level_list = list()
-        reuse_flag = False
+        #reuse_flag = False
 
         counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
         #counter = tf.zeros([self.args.batch_size, self.args.n_questions])
@@ -229,9 +229,6 @@ class DKVMNModel():
 
         # Logics
         for i in range(self.args.seq_len):
-            # To reuse linear vectors
-            if i != 0:
-                reuse_flag = True
 
             q = tf.squeeze(slice_q_data[i], 1)
             qa = tf.squeeze(slice_qa_data[i], 1)
@@ -248,16 +245,16 @@ class DKVMNModel():
 
             correlation_weight = self.memory.attention(q_embed)
 
-            mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, True)
+            mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value)
                 
-            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = tf.cond(self.using_counter, lambda:self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, tf.AUTO_REUSE, counter), lambda:self.inference(q_embed, correlation_weight, self.memory.memory_value, tf.AUTO_REUSE))
+            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = tf.cond(self.using_counter, lambda:self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, counter), lambda:self.inference(q_embed, correlation_weight, self.memory.memory_value))
             #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
             #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, True)
             prediction.append(prev_pred_logit)
 
             knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, mastery_level)
             self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
-            mastery_level = self.calculate_mastery_level(self.memory.memory_value, True)
+            mastery_level = self.calculate_mastery_level(self.memory.memory_value)
             mastery_level_list.append(mastery_level)
             
         self.mastery_level_seq = mastery_level_list
@@ -516,8 +513,10 @@ class DKVMNModel():
         test_auc, test_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
         count, metric_for_each_q = dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
         #print(metric_for_each_q)
+        '''
         for (idx, metric) in enumerate(metric_for_each_q):
             self.logger.info('{:<3d}: {:>7d}, {: .4f}, {: .4f}'.format(idx+1, count[idx], metric[0], metric[1]))
+        '''
             
 
         self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
@@ -581,7 +580,7 @@ class DKVMNModel():
         q_embed = self.embedding_q(q)
         correlation_weight = self.memory.attention(q_embed)
 
-        _, _, _, pred_prob = self.inference(q_embed, correlation_weight, value_matrix, reuse_flag = True)
+        _, _, _, pred_prob = self.inference(q_embed, correlation_weight, value_matrix)
 
         # TODO : arguemnt check for various algorithms
         pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
@@ -603,7 +602,7 @@ class DKVMNModel():
         self.total_correlation_weight = self.memory.attention(q_embeds)
        
         stacked_total_value_matrix = tf.tile(tf.expand_dims(self.total_value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
-        _, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix, True)
+        _, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix)
 
     def init_step(self):
         # q : action for RL
@@ -629,14 +628,14 @@ class DKVMNModel():
         qa_embed = self.embedding_qa(self.qa) 
 
         ######### Before Step ##########
-        prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, reuse_flag = True)
-        prev_mastery_level = self.calculate_mastery_level(stacked_value_matrix, reuse_flag = True)
+        prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix)
+        prev_mastery_level = self.calculate_mastery_level(stacked_value_matrix)
 
         ######### STEP #####################
         knowledge_growth = self.calculate_knowledge_growth(stacked_value_matrix, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, prev_mastery_level)
         # TODO : refactor sampling_a_given_q to return a only for below function call
-        self.stepped_value_matrix = tf.squeeze(self.memory.value.write_given_a(stacked_value_matrix, correlation_weight, knowledge_growth, a, True), axis=0)
-        self.stepped_read_content, self.stepped_summary, self.stepped_pred_logits, self.stepped_pred_prob = self.inference(q_embed, correlation_weight, self.stepped_value_matrix, reuse_flag = True)
+        self.stepped_value_matrix = tf.squeeze(self.memory.value.write_given_a(stacked_value_matrix, correlation_weight, knowledge_growth, a), axis=0)
+        self.stepped_read_content, self.stepped_summary, self.stepped_pred_logits, self.stepped_pred_prob = self.inference(q_embed, correlation_weight, self.stepped_value_matrix)
 
         ######### After Step #########
         self.value_matrix_difference = tf.squeeze(tf.reduce_sum(self.stepped_value_matrix - stacked_value_matrix))
