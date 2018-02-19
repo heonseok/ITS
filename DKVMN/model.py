@@ -13,8 +13,9 @@ from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
+import _model
 
-class DKVMNModel():
+class DKVMNModel(_model.Mixin):
     def __init__(self, args, sess, name='KT'):
 
         self.args = args
@@ -29,276 +30,23 @@ class DKVMNModel():
 
         self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
         
-        self.init_model()
-        self.init_total_prediction_probability()
-        self.init_mastery_level()
+        self.build_model()
+        self.build_total_prob_graph()
+        self.build_mastery_graph()
 
+    def get_init_value_matrix(self):
+        return self.sess.run(self.init_memory_value)
 
-    def inference_with_counter(self, q_embed, correlation_weight, value_matrix, counter):
-        read_content = self.memory.value.read(value_matrix, correlation_weight)
+    def get_prediction_probability(self, value_matrix):
+        return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.total_value_matrix: value_matrix}))
+    
+    def update_value_matrix(self, value_matrix, action, answer):
+       ops = [self.stepped_value_matrix]
+       value_matrix = self.sess.run(ops, feed_dict={self.q: action, self.a: answer, self.value_matrix: value_matrix})
+       return np.squeeze(value_matrix)
 
-        ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
-        #q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
-        #q_embed_content = tf.tanh(q_embed_content_logit)
-
-        counter_content_logit = operations.linear(counter, 20, name='counter_content')
-        counter_content = tf.sigmoid(counter_content_logit)
-
-        mastery_level_prior_difficulty = tf.concat([read_content, q_embed, counter_content], 1)
-        #mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content], 1)
-
-        # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Counter_Summary_Vector')
-        if self.args.summary_activation == 'tanh':
-            summary_vector = tf.tanh(summary_logit)
-        elif self.args.summary_activation == 'sigmoid':
-            summary_vector = tf.sigmoid(summary_logit)
-        elif self.args.summary_activation == 'relu':
-            summary_vector = tf.nn.relu(summary_logit)
-
-        # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
-
-        pred_prob = tf.sigmoid(pred_logits)
-
-        return read_content, summary_vector, pred_logits, pred_prob
-
-    def inference(self, q_embed, correlation_weight, value_matrix):
-        read_content = self.memory.value.read(value_matrix, correlation_weight)
-
-        ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
-        #q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
-        #q_embed_content = tf.tanh(q_embed_content_logit)
-
-        mastery_level_prior_difficulty = tf.concat([read_content, q_embed], 1)
-        #mastery_level_prior_difficulty = tf.concat([read_content, q_embed_content], 1)
-
-        # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector')
-        if self.args.summary_activation == 'tanh':
-            summary_vector = tf.tanh(summary_logit)
-        elif self.args.summary_activation == 'sigmoid':
-            summary_vector = tf.sigmoid(summary_logit)
-        elif self.args.summary_activation == 'relu':
-            summary_vector = tf.nn.relu(summary_logit)
-
-        # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
-
-        pred_prob = tf.sigmoid(pred_logits)
-
-        return read_content, summary_vector, pred_logits, pred_prob
-
-    def calculate_mastery_level(self, value_matrix):
-        #self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
-        #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
-
-        one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
-        stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
-        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 1), tf.stack([1, self.args.memory_size, 1, 1]))
-
-        # read_content : batch_size memory_size memory_state_dim 
-        read_content = self.memory.value.read_for_mastery(stacked_mastery_value_matrix, stacked_one_hot_correlation_weight)
-        #read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
-        #print('READ content shape')
-        #print(read_content.shape)
-
-        zero_q_embed = tf.zeros(shape=[self.args.batch_size, self.args.memory_size, self.args.memory_key_state_dim]) 
-        #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions]) 
-
-        #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
-        #zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
-
-        mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 2)
-        mastery_level_prior_difficulty_reshaped = tf.reshape(mastery_level_prior_difficulty, shape=[self.args.batch_size*self.args.memory_size, -1])
-        #print('Mastery level prior difficulty')
-        #print(mastery_level_prior_difficulty.shape)
-
-        # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty_reshaped, self.args.final_fc_dim, name='Summary_Vector')
-        if self.args.summary_activation == 'tanh':
-            summary_vector = tf.tanh(summary_logit)
-        elif self.args.summary_activation == 'sigmoid':
-            summary_vector = tf.sigmoid(summary_logit)
-        elif self.args.summary_activation == 'relu':
-            summary_vector = tf.nn.relu(summary_logit)
-
-        # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
-
-        pred_logits_reshaped = tf.reshape(pred_logits, shape=[self.args.batch_size, -1])
-        #print('HEllow owrld')
-        #print(tf.shape(pred_logits_reshaped))
-
-        return tf.sigmoid(pred_logits_reshaped)
-        #self.concept_mastery_level = tf.sigmoid(pred_logits)
-
-    def init_memory(self):
-        with tf.variable_scope('Memory'):
-            init_memory_key = tf.get_variable('key', [self.args.memory_size, self.args.memory_key_state_dim], \
-                initializer=tf.random_normal_initializer(stddev=0.1))
-            self.init_memory_value = tf.get_variable('value', [self.args.memory_size,self.args.memory_value_state_dim], \
-                initializer=tf.random_normal_initializer(stddev=0.1))
-                
-        # Broadcast memory value tensor to match [batch size, memory size, memory state dim]
-        # First expand dim at axis 0 so that makes 'batch size' axis and tile it along 'batch size' axis
-        # tf.tile(inputs, multiples) : multiples length must be thes saame as the number of dimensions in input
-        # tf.stack takes a list and convert each element to a tensor
-        self.stacked_init_memory_value = tf.tile(tf.expand_dims(self.init_memory_value, 0), tf.stack([self.args.batch_size, 1, 1]))
-                
-        return DKVMN(self.args.memory_size, self.args.memory_key_state_dim, \
-                self.args.memory_value_state_dim, init_memory_key=init_memory_key, init_memory_value=self.stacked_init_memory_value, args=self.args, name='DKVMN')
-
-    def init_embedding_mtx(self):
-        # Embedding to [batch size, seq_len, memory_state_dim(d_k or d_v)]
-        with tf.variable_scope('Embedding'):
-            # A
-            self.q_embed_mtx = tf.get_variable('q_embed', [self.args.n_questions+1, self.args.memory_key_state_dim],\
-                initializer=tf.random_normal_initializer(stddev=0.1))
-                #initializer=tf.truncated_normal_initializer(stddev=0.1))
-            # B
-            self.qa_embed_mtx = tf.get_variable('qa_embed', [2*self.args.n_questions+1, self.args.memory_value_state_dim], initializer=tf.random_normal_initializer(stddev=0.1))        
-            #self.qa_embed_mtx = tf.get_variable('qa_embed', [2*self.args.n_questions+1, self.args.memory_value_state_dim], initializer=tf.truncated_normal_initializer(stddev=0.1))        
-        
-
-    def embedding_q(self, q):
-        return tf.nn.embedding_lookup(self.q_embed_mtx, q)
-
-    def embedding_qa(self, qa):
-        return tf.nn.embedding_lookup(self.qa_embed_mtx, qa)
-        
-
-    def calculate_knowledge_growth(self, value_matrix, correlation_weight, qa_embed, read_content, summary, pred_prob, mastery_level):
-        if self.args.knowledge_growth == 'origin': 
-            return qa_embed
-        
-        elif self.args.knowledge_growth == 'value_matrix':
-            value_matrix_reshaped = tf.reshape(value_matrix, [self.args.batch_size, -1])
-            return tf.concat([value_matrix_reshaped, qa_embed], 1)
-
-        elif self.args.knowledge_growth == 'read_content':
-            read_content_reshaped = tf.reshape(read_content, [self.args.batch_size, -1])
-            return tf.concat([read_content_reshaped, qa_embed], 1)
-
-        elif self.args.knowledge_growth == 'summary':
-            summary_reshaped = tf.reshape(summary, [self.args.batch_size, -1])
-            return tf.concat([summary_reshaped, qa_embed], 1)
- 
-        elif self.args.knowledge_growth == 'pred_prob':
-            pred_prob_reshaped = tf.reshape(pred_prob, [self.args.batch_size, -1])
-            return tf.concat([pred_prob_reshaped, qa_embed], 1)
-
-        elif self.args.knowledge_growth == 'mastery':
-            mastery_reshaped = tf.reshape(mastery_level, [self.args.batch_size, -1])
-            return tf.concat([mastery_reshaped, qa_embed], 1)
-            
-            
-
-    def init_model(self):
-        # 'seq_len' means question sequences
-        self.q_data_seq = tf.placeholder(tf.int32, [None, self.args.seq_len], name='q_data_seq') 
-        self.qa_data_seq = tf.placeholder(tf.int32, [None, self.args.seq_len], name='qa_data')
-        self.target_seq = tf.placeholder(tf.float32, [None, self.args.seq_len], name='target')
-
-        self.selected_mastery_index = tf.placeholder(tf.int32, name='selected_mastery_index')
-
-        self.using_counter = tf.placeholder(tf.bool)
-
-        '''
-        self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
-        self.qa_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='qa_data')
-        self.target_seq = tf.placeholder(tf.float32, [self.args.batch_size, self.args.seq_len], name='target')
-        '''
-
-        self.memory = self.init_memory()
-        self.init_embedding_mtx()
-            
-        slice_q_data = tf.split(self.q_data_seq, self.args.seq_len, 1) 
-        slice_qa_data = tf.split(self.qa_data_seq, self.args.seq_len, 1) 
-
-        
-        prediction = list()
-        mastery_level_list = list()
-        #reuse_flag = False
-
-        counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
-        #counter = tf.zeros([self.args.batch_size, self.args.n_questions])
-
-        #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
-        #mastery_level_list.append(mastery_level)
-
-        # Logics
-        for i in range(self.args.seq_len):
-
-            q = tf.squeeze(slice_q_data[i], 1)
-            qa = tf.squeeze(slice_qa_data[i], 1)
-            a = tf.cast(tf.greater(qa, tf.constant(self.args.n_questions)), tf.float32)
-
-            '''
-            one_hot_q = tf.one_hot(q, self.args.n_questions)
-            counter = counter + one_hot_q
-            '''
-
-            q_embed = self.embedding_q(q)
-            counter = counter + q_embed
-            qa_embed = self.embedding_qa(qa)
-
-            correlation_weight = self.memory.attention(q_embed)
-
-            mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value)
-                
-            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = tf.cond(self.using_counter, lambda:self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, counter), lambda:self.inference(q_embed, correlation_weight, self.memory.memory_value))
-            #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
-            #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, True)
-            prediction.append(prev_pred_logit)
-
-            knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, mastery_level)
-            self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
-            mastery_level = self.calculate_mastery_level(self.memory.memory_value)
-            mastery_level_list.append(mastery_level)
-            
-        self.mastery_level_seq = mastery_level_list
-        #self.prediction_seq = tf.sigmoid(prediction) 
-        
-        # 'prediction' : seq_len length list of [batch size ,1], make it [batch size, seq_len] tensor
-        # tf.stack convert to [batch size, seq_len, 1]
-        pred_logits = tf.reshape(tf.stack(prediction, axis=1), [self.args.batch_size, self.args.seq_len]) 
-        self.pred = tf.sigmoid(pred_logits)
-
-        # filtered by selected_mastery_index
-        #self.target_seq = self.target_seq[:, self.selected_mastery_index+1:]
-        #pred_logits = pred_logits[:, self.selected_mastery_index+1:]
-
-        # Define loss : standard cross entropy loss, need to ignore '-1' label example
-        # Make target/label 1-d array
-        target_1d = tf.reshape(self.target_seq, [-1])
-        pred_logits_1d = tf.reshape(pred_logits, [-1])
-        index = tf.where(tf.not_equal(target_1d, tf.constant(-1., dtype=tf.float32)))
-        # tf.gather(params, indices) : Gather slices from params according to indices
-        filtered_target = tf.gather(target_1d, index)
-        filtered_logits = tf.gather(pred_logits_1d, index)
-
-
-        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
-        #self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
-
-        # Optimizer : SGD + MOMENTUM with learning rate decay
-        self.global_step = tf.Variable(0, trainable=False)
-        self.lr = tf.placeholder(tf.float32, [], name='learning_rate')
-        #self.learning_rate = tf.train.exponential_decay(self.args.initial_lr, global_step=self.global_step, decay_steps=self.args.anneal_interval*(tf.shape(self.q_data_seq)[0] // self.args.batch_size), decay_rate=0.667, staircase=True)
-        optimizer = tf.train.MomentumOptimizer(self.lr, self.args.momentum)
-        grads, vrbs = zip(*optimizer.compute_gradients(self.loss))
-        self.grads = grads
-        grad, self.global_norm = tf.clip_by_global_norm(grads, self.args.maxgradnorm)
-        
-        self.train_op = optimizer.apply_gradients(list(zip(grad, vrbs)), global_step=self.global_step)
-        self.tr_vrbs = tf.trainable_variables()
-        for i in self.tr_vrbs:
-            print(i.name)
-            print(i.shape)
-
-        self.saver = tf.train.Saver(max_to_keep=1000)
-        print('Finish init_model')
+    def expand_dims(self, val):
+        return np.expand_dims(np.expand_dims(val, axis=0), axis=0)
 
 
     def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir='', selected_mastery_index=-1):
@@ -324,11 +72,11 @@ class DKVMNModel():
         self.train_count = 0
         #if self.args.init_from:
         if self.load():
-            print('Checkpoint exists')
+            self.logger.debug('Checkpoint exists')
             #print('Checkpoint exists and skip training')
             #return 
         else:
-            print('No checkpoint')
+            self.logger.debug('No checkpoint')
         '''
         else:
             if os.path.exists(os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)):
@@ -370,8 +118,6 @@ class DKVMNModel():
                 target_batch = target_batch.astype(np.float)
 
                 feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr, self.selected_mastery_index:selected_mastery_index, self.using_counter:self.args.using_counter}
-                #loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
-                #loss_, pred_, _, global_norm, grads, _lr = self.sess.run([self.loss, self.pred, self.train_op, self.global_norm, self.grads, self.learning_rate], feed_dict=feed_dict)
                 loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
 
                 pred_ = pred_[:,selected_mastery_index+1:] 
@@ -401,8 +147,8 @@ class DKVMNModel():
 
             train_auc, train_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
             epoch_loss = epoch_loss / training_step    
-            print('Epoch %d/%d, loss : %3.5f, auc : %3.5f, accuracy : %3.5f' % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy))
-            self.write_log(epoch=epoch+1, auc=train_auc, accuracy=train_accuracy, loss=epoch_loss, name='training_')
+            self.logger.debug('Epoch %d/%d, loss : %3.5f, auc : %3.5f, accuracy : %3.5f' % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy))
+            #self.write_log(epoch=epoch+1, auc=train_auc, accuracy=train_accuracy, loss=epoch_loss, name='training_')
 
             valid_steps = valid_q_data.shape[0] // self.args.batch_size
             valid_pred_list = list()
@@ -431,11 +177,11 @@ class DKVMNModel():
             all_valid_target = np.concatenate(valid_target_list, axis=0)
 
             valid_auc, valid_accuracy = dkvmn_utils.calculate_metric(all_valid_target, all_valid_pred)
-            print('Epoch %d/%d, valid auc : %3.5f, valid accuracy : %3.5f' %(epoch+1, self.args.num_epochs, valid_auc, valid_accuracy))
+            self.logger.debug('Epoch %d/%d, valid auc : %3.5f, valid accuracy : %3.5f' %(epoch+1, self.args.num_epochs, valid_auc, valid_accuracy))
             # Valid log
-            self.write_log(epoch=epoch+1, auc=valid_auc, accuracy=valid_accuracy, loss=valid_loss, name='valid_')
+            #self.write_log(epoch=epoch+1, auc=valid_auc, accuracy=valid_accuracy, loss=valid_loss, name='valid_')
             if valid_auc > best_valid_auc:
-                print('%3.4f to %3.4f' % (best_valid_auc, valid_auc))
+                self.logger.debug('%3.4f to %3.4f' % (best_valid_auc, valid_auc))
                 best_valid_auc = valid_auc
                 best_epoch = epoch + 1
                 self.save(best_epoch, checkpoint_dir)
@@ -444,7 +190,7 @@ class DKVMNModel():
                 early_stop_counter += 1 
 
             if early_stop and early_stop_counter > self.args.early_stop_th:
-                print('Eearly stop')
+                self.logger.debug('Eearly stop')
                 return best_epoch
 
         return best_epoch    
@@ -453,17 +199,14 @@ class DKVMNModel():
         steps = test_q.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
         if self.load(checkpoint_dir):
-            print('CKPT Loaded')
+            self.logger.debug('CKPT Loaded')
         else:
-            raise Exception('CKPT need')
+            self.logger.debug('CKPT need')
+            raise Exception()
 
-        #print('Initial value of probability')
-        #print(init_probability)
 
         pred_list = list()
-        #pred_list_2d = list()
         target_list = list()
-        #target_list_2d = list()
         q_list = list()
 
         for s in range(steps):
@@ -511,31 +254,15 @@ class DKVMNModel():
         all_q = np.concatenate(q_list, axis=0)
 
         test_auc, test_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
-        count, metric_for_each_q = dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
+        #count, metric_for_each_q = dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
         #print(metric_for_each_q)
         '''
         for (idx, metric) in enumerate(metric_for_each_q):
             self.logger.info('{:<3d}: {:>7d}, {: .4f}, {: .4f}'.format(idx+1, count[idx], metric[0], metric[1]))
         '''
-            
 
         self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
-        self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
-
-        '''
-        log_file_name = '{}_{}_test_result.txt'.format(self.args.prefix, self.args.dataset)
-        log_file_path = os.path.join(self.args.dkvmn_test_result_dir, log_file_name)
-        log_file = open(log_file_path, 'a')
-        log = 'Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy)
-
-        if checkpoint_dir == '':
-            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
-
-        log_file.write(checkpoint_dir + '\n')
-        #log_file.write(self.model_dir + '\n')
-        log_file.write(log + '\n') 
-        log_file.flush()    
-        '''
+        #self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
         return pred_list_2d, target_list_2d, test_auc, test_accuracy
         
@@ -547,7 +274,9 @@ class DKVMNModel():
         else:
             raise Exception('CKPT need')
 
-        value_matrix = self.sess.run(self.init_memory_value)
+        value_matrix = self.get_init_value_matrix()
+        #value_matrix = self.sess.run(self.init_memory_value)
+
         total_cor_weight = self.sess.run(self.total_correlation_weight, feed_dict={self.total_value_matrix : value_matrix})
     
         kmeans = KMeans(n_clusters=self.args.memory_size).fit(total_cor_weight)
@@ -571,145 +300,8 @@ class DKVMNModel():
         #'''
 
         plt.show()
-        #fig = plt.figure()
-        #fig.savefig('actions.png')
         
-         
 
-########################################################## FOR Reinforcement Learning ##############################################################
-
-    def sampling_a_given_q(self, q, value_matrix):
-        q_embed = self.embedding_q(q)
-        correlation_weight = self.memory.attention(q_embed)
-
-        _, _, _, pred_prob = self.inference(q_embed, correlation_weight, value_matrix)
-
-        # TODO : arguemnt check for various algorithms
-        pred_prob = tf.clip_by_value(pred_prob, 0.3, 1.0)
-
-        threshold = tf.random_uniform(pred_prob.shape)
-
-        a = tf.cast(tf.less(threshold, pred_prob), tf.int32)
-        qa = q + tf.multiply(a, self.args.n_questions)[0]
-
-        return qa 
-
-
-    def init_total_prediction_probability(self):
-        #self.total_q_data = tf.placeholder(tf.int32, [self.args.n_questions], name='total_q_data') 
-        self.total_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='total_value_matrix')
-
-        total_q_data = tf.constant(np.arange(1,self.args.n_questions+1))
-        q_embeds = self.embedding_q(total_q_data)
-        self.total_correlation_weight = self.memory.attention(q_embeds)
-       
-        stacked_total_value_matrix = tf.tile(tf.expand_dims(self.total_value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
-        _, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix)
-
-    def init_step(self):
-        # q : action for RL
-        # value_matrix : state for RL
-        self.q = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_q') 
-        self.a = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_a') 
-        self.value_matrix = tf.placeholder(tf.float32, [self.args.memory_size, self.args.memory_value_state_dim], name='step_value_matrix')
-
-        slice_a = tf.split(self.a, self.args.seq_len, 1) 
-        a = tf.squeeze(slice_a[0], 1)
- 
-        slice_q = tf.split(self.q, self.args.seq_len, 1) 
-        q = tf.squeeze(slice_q[0], 1)
-        q_embed = self.embedding_q(q)
-        correlation_weight = self.memory.attention(q_embed)
-
-        stacked_value_matrix = tf.tile(tf.expand_dims(self.value_matrix, 0), tf.stack([self.args.batch_size, 1, 1]))
-         
-        # -1 for sampling
-        # 0, 1 for given answer
-        self.qa = tf.cond(tf.squeeze(a) < 0, lambda: self.sampling_a_given_q(q, stacked_value_matrix), lambda: q + tf.multiply(a, self.args.n_questions))
-        a = (self.qa-1) // self.args.n_questions
-        qa_embed = self.embedding_qa(self.qa) 
-
-        ######### Before Step ##########
-        prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix)
-        prev_mastery_level = self.calculate_mastery_level(stacked_value_matrix)
-
-        ######### STEP #####################
-        knowledge_growth = self.calculate_knowledge_growth(stacked_value_matrix, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, prev_mastery_level)
-        # TODO : refactor sampling_a_given_q to return a only for below function call
-        self.stepped_value_matrix = tf.squeeze(self.memory.value.write_given_a(stacked_value_matrix, correlation_weight, knowledge_growth, a), axis=0)
-        self.stepped_read_content, self.stepped_summary, self.stepped_pred_logits, self.stepped_pred_prob = self.inference(q_embed, correlation_weight, self.stepped_value_matrix)
-
-        ######### After Step #########
-        self.value_matrix_difference = tf.squeeze(tf.reduce_sum(self.stepped_value_matrix - stacked_value_matrix))
-        self.read_content_difference = tf.squeeze(tf.reduce_sum(self.stepped_read_content - prev_read_content))
-        self.summary_difference = tf.squeeze(tf.reduce_sum(self.stepped_summary - prev_summary))
-        self.pred_logit_difference = tf.squeeze(tf.reduce_sum(self.stepped_pred_logits - prev_pred_logits))
-        self.pred_prob_difference = tf.squeeze(tf.reduce_sum(self.stepped_pred_prob - prev_pred_prob))
-
-    def init_mastery_level(self):
-        self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
-        #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
-
-        one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
-        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(self.mastery_value_matrix, 0), tf.stack([self.args.memory_size, 1, 1]))
-
-        read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
-        print('READ content shape')
-        print(read_content.shape)
-        zero_q_embed = tf.zeros(shape=[self.args.memory_size, self.args.memory_key_state_dim]) 
-        #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions]) 
-
-        #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
-        #zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
-
-        mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 1)
-        print('Mastery level prior difficulty')
-        print(mastery_level_prior_difficulty.shape)
-
-        # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector')
-        if self.args.summary_activation == 'tanh':
-            summary_vector = tf.tanh(summary_logit)
-        elif self.args.summary_activation == 'sigmoid':
-            summary_vector = tf.sigmoid(summary_logit)
-        elif self.args.summary_activation == 'relu':
-            summary_vector = tf.nn.relu(summary_logit)
-
-        # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
-
-        self.concept_mastery_level = tf.sigmoid(pred_logits)
-
-    '''
-    def init_mastery_level(self):
-        self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
-        self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
-
-        one_hot_correlation_weight = tf.one_hot(self.target_concept_index, self.args.memory_size)
-        read_content = self.memory.value.read(self.mastery_value_matrix, one_hot_correlation_weight)
-        print('READ content shape')
-        print(read_content.shape)
-        zero_q_embed = tf.zeros(shape=[1,50]) 
-        mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 1)
-        print('Mastery level prior difficulty')
-        print(mastery_level_prior_difficulty.shape)
-
-        # f_t
-        summary_logit = operations.linear(mastery_level_prior_difficulty, self.args.final_fc_dim, name='Summary_Vector', reuse=True)
-        if self.args.summary_activation == 'tanh':
-            summary_vector = tf.tanh(summary_logit)
-        elif self.args.summary_activation == 'sigmoid':
-            summary_vector = tf.sigmoid(summary_logit)
-        elif self.args.summary_activation == 'relu':
-            summary_vector = tf.nn.relu(summary_logit)
-
-        # p_t
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction', reuse=True)
-
-        self.concept_mastery_level = tf.sigmoid(pred_logits)
-    '''
-
-        
 
     def ideal_test(self):
         type_list = [-1]
@@ -764,14 +356,10 @@ class DKVMNModel():
         network_detail = '_MemSize{}'.format(self.args.memory_size)
         #hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
         #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
-
         remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
         
         return self.args.prefix + network_spec + network_detail + remove_short
-        #return self.args.prefix + network_spec + hyper_parameters + data_postfix
 
-        #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.initial_lr, self.args.num_epochs)
-        #return '{}Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_{}_lr{}_{}epochs'.format(self.args.prefix, self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.dataset, self.args.initial_lr, self.args.num_epochs)
 
     def load(self, checkpoint_dir=''):
         if checkpoint_dir == '':
@@ -782,10 +370,10 @@ class DKVMNModel():
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
             self.train_count = int(ckpt_name.split('-')[-1])
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-            print('DKVMN ckpt loaded')
+            self.logger.debug('DKVMN ckpt loaded')
             return True
         else:
-            print('DKVMN cktp not loaded')
+            self.logger.debug('DKVMN cktp not loaded')
             return False
 
     def save(self, global_step, checkpoint_dir=''):
@@ -795,9 +383,10 @@ class DKVMNModel():
         if not os.path.exists(checkpoint_dir):
             os.mkdir(checkpoint_dir)
         self.saver.save(self.sess, os.path.join(checkpoint_dir, model_name), global_step=global_step)
-        print('Save checkpoint at %d' % (global_step+1))
+        self.logger.debug('Save checkpoint at %d' % (global_step+1))
 
     # Log file
+    '''
     def write_log(self, auc, accuracy, loss, epoch, name='training_'):
         log_path = os.path.join(self.args.dkvmn_log_dir, name+self.model_dir+'.csv')
         if not os.path.exists(log_path):
@@ -808,4 +397,5 @@ class DKVMNModel():
         
         self.log_file.write(str(epoch) + '\t' + str(auc) + '\t' + str(accuracy) + '\t' + str(loss) + '\n')
         self.log_file.flush()    
+    '''
         

@@ -55,18 +55,20 @@ def main():
     try:
         parser = argparse.ArgumentParser()
         parser.add_argument('--prefix', type=str, default='')
+        parser.add_argument('--logging_level', type=str, choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'], default='INFO')
 
         ########## Control flag ##########
         parser.add_argument('--dkvmn_train', type=str2bool, default='f')
         parser.add_argument('--dkvmn_test', type=str2bool, default='f')
+        parser.add_argument('--dkvmn_ideal_test', type=str2bool, default='f')
+
         parser.add_argument('--dkvmn_clustering_actions', type=str2bool, default='f')
+        parser.add_argument('--dkvmn_analysis', type=str2bool, default='f')
 
         parser.add_argument('--dqn_train', type=str2bool, default='f')
         parser.add_argument('--dqn_test', type=str2bool, default='f')
         parser.add_argument('--gpu_id', type=str, default='0')
 
-        ########## Ideal test for DKVMN
-        parser.add_argument('--dkvmn_ideal_test', type=str2bool, default='f')
 
         ########## Data preprocessing #########
         parser.add_argument('--remove_infrequent_skill', type=str2bool, default='f')
@@ -79,7 +81,7 @@ def main():
         
         ########## DKVMN ##########
         parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
-        parser.add_argument('--num_epochs', type=int, default=100)
+        parser.add_argument('--num_epochs', type=int, default=2)
         parser.add_argument('--init_from', type=str2bool, default='t')
         parser.add_argument('--show', type=str2bool, default='f')
         parser.add_argument('--early_stop', type=str2bool, default='f')
@@ -90,7 +92,7 @@ def main():
         parser.add_argument('--momentum', type=float, default=0.9)
         parser.add_argument('--initial_lr', type=float, default=0.05)
 
-        parser.add_argument('--dkvmn_checkpoint_dir', type=str, default='DKVMN/new_checkpoint')
+        parser.add_argument('--dkvmn_checkpoint_dir', type=str, default='DKVMN/checkpoint')
         parser.add_argument('--dkvmn_log_dir', type=str, default='DKVMN/log')
         parser.add_argument('--data_dir', type=str, default='DKVMN/data')
         parser.add_argument('--data_name', type=str, default='assist2009_updated')
@@ -101,9 +103,6 @@ def main():
         parser.add_argument('--test_postfix', type=str, default='test')
         '''
 
-        #parser.add_argument('--dkvmn_test_result_dir', type=str, default='dkvmn_test_result')
-
-        parser.add_argument('--dkvmn_analysis', type=str2bool, default='f')
 
         ########## Modified DKVMN ##########
         parser.add_argument('--knowledge_growth', type=str, choices=['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'], default='value_matrix')
@@ -165,23 +164,17 @@ def main():
 
         parser.add_argument('--num_test_episode', type=int, default=100)
 
-        parser.add_argument('--logging_level', type=str, choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'], default='INFO')
 
         parser.add_argument('--terminal_condition', type=str, choices=['prob, mastery'], default='prob')
         parser.add_argument('--terminal_threshold', type=float, default=0.9)
 
-        #parser.add_argument('--dqn_test_result_dir', type=str, default='dqn_test_result')
         parser.add_argument('--sampling_action_type', type=str, choices=['uniform', 'clipping'], default='uniform')
 
-
-
         myArgs = parser.parse_args()
-
         setHyperParamsForDataset(myArgs)
 
-
         myArgs.episode_maxstep = myArgs.n_questions * 10
-        
+
         if myArgs.test_policy_type != 'dqn':
             myArgs.dqn_train = False 
 
@@ -191,33 +184,6 @@ def main():
             os.makedirs(myArgs.dkvmn_checkpoint_dir)
         if not os.path.exists(myArgs.dkvmn_log_dir):
             os.makedirs(myArgs.dkvmn_log_dir)
-
-        #if not os.path.exists(myArgs.dkvmn_test_result_dir):
-            #os.makedirs(myArgs.dkvmn_test_result_dir)
-        #if not os.path.exists(myArgs.dqn_test_result_dir):
-            #os.makedirs(myArgs.dqn_test_result_dir)
-
-
-        data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)
-        data_path = os.path.join(data_directory, myArgs.data_name + '_data.csv')
-
-        train_data_path = os.path.join(data_directory, myArgs.data_name + '_train.npz')
-        valid_data_path = os.path.join(data_directory, myArgs.data_name + '_valid.npz')
-        test_data_path = os.path.join(data_directory, myArgs.data_name + '_test.npz')
-
-        ### Split data 
-        if myArgs.split_data_flag == True:
-            print('#####SPLIT DATA#####')
-            data = DATA_LOADER(myArgs, ',')
-            total_q_data, total_qa_data = data.load_data(data_path)
-
-            _train_q, test_q, _train_qa, test_qa = train_test_split(total_q_data, total_qa_data, test_size=0.2)
-            train_q, valid_q, train_qa, valid_qa = train_test_split(_train_q, _train_qa, test_size=0.2)
-            
-            np.savez(train_data_path, q=train_q, qa=train_qa)
-            np.savez(valid_data_path, q=valid_q, qa=valid_qa)
-            np.savez(test_data_path, q=test_q, qa=test_qa)
-
 
         ### check dqn dir ###
         if not os.path.exists(myArgs.dqn_checkpoint_dir):
@@ -230,75 +196,75 @@ def main():
         #run_config.log_device_placement = True
         run_config.gpu_options.allow_growth = True
 
+
+        if myArgs.dkvmn_train or myArgs.dkvmn_test or myArgs.dkvmn_clustering_actions or myArgs.clustered_dkvmn_train or myArgs.clustered_dkvmn_test or myArgs.dkvmn_analysis or myArgs.dkvmn_ideal_test: 
+            ### Split data 
+            data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)
+            data_path = os.path.join(data_directory, myArgs.data_name + '_data.csv')
+
+            train_data_path = os.path.join(data_directory, myArgs.data_name + '_train.npz')
+            valid_data_path = os.path.join(data_directory, myArgs.data_name + '_valid.npz')
+            test_data_path = os.path.join(data_directory, myArgs.data_name + '_test.npz')
+
+            if myArgs.split_data_flag == True:
+                #print('#####SPLIT DATA#####')
+                data = DATA_LOADER(myArgs, ',')
+                total_q_data, total_qa_data = data.load_data(data_path)
+
+                _train_q, test_q, _train_qa, test_qa = train_test_split(total_q_data, total_qa_data, test_size=0.2)
+                train_q, valid_q, train_qa, valid_qa = train_test_split(_train_q, _train_qa, test_size=0.2)
+                
+                np.savez(train_data_path, q=train_q, qa=train_qa)
+                np.savez(valid_data_path, q=valid_q, qa=valid_qa)
+                np.savez(test_data_path, q=test_q, qa=test_qa)
+
+            train_data = np.load(train_data_path)
+            train_q_data = train_data['q']
+            train_qa_data = train_data['qa']
+
+            #print('Number of train_q_data: {}'.format(len(train_q_data)))
+
+            valid_data = np.load(valid_data_path)
+            valid_q_data = valid_data['q']
+            valid_qa_data = valid_data['qa']
+            #print('Shape of train data : %s, valid data : %s' % (train_q_data.shape, valid_q_data.shape))
+
+            test_data = np.load(test_data_path)
+            test_q_data = test_data['q']
+            test_qa_data = test_data['qa']
+
+
         with tf.Session(config=run_config) as sess:
-            
             dkvmn = DKVMNModel(myArgs, sess, name='DKVMN')
+
             ##### DKVMN #####
             if myArgs.dkvmn_train:
-                train_data = np.load(train_data_path)
-                train_q_data = train_data['q']
-                train_qa_data = train_data['qa']
-
-                print('Train data loaded')
-                print('Number of train_q_data: {}'.format(len(train_q_data)))
-
-                valid_data = np.load(valid_data_path)
-                valid_q_data = valid_data['q']
-                valid_qa_data = valid_data['qa']
-                print('Valid data loaded')
-                print('Shape of train data : %s, valid data : %s' % (train_q_data.shape, valid_q_data.shape))
-                print('Start training')
-                print(myArgs.seq_len)
                 dkvmn.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data, myArgs.early_stop)
 
             if myArgs.dkvmn_test:
-                test_data = np.load(test_data_path)
-                test_q_data = test_data['q']
-                test_qa_data = test_data['qa']
-
-                print('Test data loaded')
                 dkvmn.test(test_q_data, test_qa_data)
 
             if myArgs.dkvmn_clustering_actions:
                 dkvmn.clustering_actions()
 
-
             if myArgs.clustered_dkvmn_train:
                 cDKVMN = ClusteredDKVMN(myArgs, sess, dkvmn)
-                train_data = np.load(train_data_path)
-                train_q_data = train_data['q']
-                train_qa_data = train_data['qa']
-                print('Number of train_q_data: {}'.format(len(train_q_data)))
-
-                valid_data = np.load(valid_data_path)
-                valid_q_data = valid_data['q']
-                valid_qa_data = valid_data['qa']
-
-                test_data = np.load(test_data_path)
-                test_q_data = test_data['q']
-                test_qa_data = test_data['qa']
-
                 cDKVMN.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data, test_q_data, test_qa_data)
 
             if myArgs.clustered_dkvmn_test:
                 cDKVMN = ClusteredDKVMN(myArgs, sess, dkvmn)
-                test_data = np.load(test_data_path)
-                test_q_data = test_data['q']
-                test_qa_data = test_data['qa']
-
                 cDKVMN.test(test_q_data, test_qa_data)
 
-            if myArgs.dkvmn_analysis == True:
+            if myArgs.dkvmn_analysis:
                 myArgs.batch_size = 1
                 myArgs.seq_len = 1
                 aDKVMN = DKVMNAnalyzer(myArgs, sess, dkvmn)
                 aDKVMN.test1()
-
     
             if myArgs.dkvmn_ideal_test:
                 myArgs.batch_size = 1
                 myArgs.seq_len = 1
-                dkvmn.init_step()
+                dkvmn.build_step_graph()
                 dkvmn.ideal_test()
             
             ##### DQN #####
@@ -308,7 +274,7 @@ def main():
                 myArgs.batch_size = 1
                 myArgs.seq_len = 1
                 myAgent = DKVMNAgent(myArgs, sess, dkvmn)
-                dkvmn.init_step()
+                dkvmn.build_step_graph()
 
             if myArgs.dqn_train:
                 if os.path.exists('./train.csv'):
@@ -319,9 +285,7 @@ def main():
                 myAgent.play()
     
     except KeyboardInterrupt:
-        myArgs.train = False
-        myAgent.play(3, False)
-        myAgent.save()
+        #print('Program END')
         sess.close()
 
 if __name__ == '__main__':

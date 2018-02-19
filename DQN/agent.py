@@ -45,30 +45,6 @@ class DKVMNAgent():
         self.logger.info('{:<20s}: {}'.format('Policy type', self.args.test_policy_type))
 
 
-    #def process_state(self, next_state):
-        #self.state = next_state
-
-    '''
-    def set_logger(self):
-        logger = logging.getLogger('DQN')
-
-        streamFormatter = logging.Formatter('[%(levelname)s] %(message)s')
-        streamHandler = logging.StreamHandler()
-        streamHandler.setFormatter(streamFormatter)
-        streamHandler.setLevel(logging.DEBUG)
-
-        fileFormatter = logging.Formatter('%(message)s')
-        fileHandler = logging.FileHandler('./policy.log')
-        fileHandler.setFormatter(fileFormatter)
-        fileHandler.setLevel(logging.INFO)
-
-        logger.addHandler(streamHandler)
-        logger.addHandler(fileHandler)
-
-        return logger
-    '''
-
-
     def train(self):
         self.logger.debug('Agent is training')
         self.episode_count = 0
@@ -208,22 +184,6 @@ class DKVMNAgent():
         self.logger.info('{:<20s}: {:>.2f}'.format('Non terminal avg', non_terminal_avg))
 
         self.logger.info('\n')
-
-        # print probability info
-
-
-        #result = '%s policy, average number of access: %f, correct_count: %f, correct_rate: %f, actions: %f' % (self.args.test_policy_type, access_avg, correct_count_avg, correct_rate_avg, action_count_avg)
-        #self.logger.info(result)
-
-
-        '''
-        log_file_name = '{}_test_result.txt'.format(self.args.dataset)
-        log_file_path = os.path.join(self.args.dqn_test_result_dir, log_file_name)
-        log_file = open(log_file_path, 'a')
-        log_file.write('\n' + self.model_dir + '\n')
-        log_file.write(result + '\n')
-        log_file.flush()
-        '''
 
 
     def select_action(self):
