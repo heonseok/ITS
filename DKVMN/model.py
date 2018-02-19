@@ -522,6 +522,7 @@ class DKVMNModel():
         self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
         self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
+        '''
         log_file_name = '{}_{}_test_result.txt'.format(self.args.prefix, self.args.dataset)
         log_file_path = os.path.join(self.args.dkvmn_test_result_dir, log_file_name)
         log_file = open(log_file_path, 'a')
@@ -534,6 +535,7 @@ class DKVMNModel():
         #log_file.write(self.model_dir + '\n')
         log_file.write(log + '\n') 
         log_file.flush()    
+        '''
 
         return pred_list_2d, target_list_2d, test_auc, test_accuracy
         

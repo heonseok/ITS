@@ -101,7 +101,7 @@ def main():
         parser.add_argument('--test_postfix', type=str, default='test')
         '''
 
-        parser.add_argument('--dkvmn_test_result_dir', type=str, default='dkvmn_test_result')
+        #parser.add_argument('--dkvmn_test_result_dir', type=str, default='dkvmn_test_result')
 
         parser.add_argument('--dkvmn_analysis', type=str2bool, default='f')
 
@@ -170,7 +170,7 @@ def main():
         parser.add_argument('--terminal_condition', type=str, choices=['prob, mastery'], default='prob')
         parser.add_argument('--terminal_threshold', type=float, default=0.9)
 
-        parser.add_argument('--dqn_test_result_dir', type=str, default='dqn_test_result')
+        #parser.add_argument('--dqn_test_result_dir', type=str, default='dqn_test_result')
         parser.add_argument('--sampling_action_type', type=str, choices=['uniform', 'clipping'], default='uniform')
 
 
@@ -191,10 +191,11 @@ def main():
             os.makedirs(myArgs.dkvmn_checkpoint_dir)
         if not os.path.exists(myArgs.dkvmn_log_dir):
             os.makedirs(myArgs.dkvmn_log_dir)
-        if not os.path.exists(myArgs.dkvmn_test_result_dir):
-            os.makedirs(myArgs.dkvmn_test_result_dir)
-        if not os.path.exists(myArgs.dqn_test_result_dir):
-            os.makedirs(myArgs.dqn_test_result_dir)
+
+        #if not os.path.exists(myArgs.dkvmn_test_result_dir):
+            #os.makedirs(myArgs.dkvmn_test_result_dir)
+        #if not os.path.exists(myArgs.dqn_test_result_dir):
+            #os.makedirs(myArgs.dqn_test_result_dir)
 
 
         data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)
