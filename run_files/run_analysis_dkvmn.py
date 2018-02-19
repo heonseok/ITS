@@ -42,16 +42,16 @@ for knowledge_growth in knowledge_growth_list:
                                     args_list = []
                                     args_list.append('python main.py')
 
-                                    args_list.append('--dkvmn_train t --dkvmn_test t --dkvmn_ideal_test f')
+                                    args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f')
                                     args_list.append('--dqn_train f --dqn_test f')
                                     args_list.append('--terminal_condition_type posneg_mastery') 
 
                                     args_list.append('--using_counter f')
-                                    args_list.append('--dkvmn_analysis f')
+                                    args_list.append('--dkvmn_analysis t')
                                     args_list.append('--dkvmn_clustering_actions f')
 
                                     args_list.append('--gpu_id 0')
-                                    args_list.append('--logging_level INFO')
+                                    args_list.append('--logging_level DEBUG')
 
                                     args_list.append('--test_policy_type')
                                     args_list.append(policy_type)
