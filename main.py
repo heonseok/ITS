@@ -67,6 +67,8 @@ def main():
 
         parser.add_argument('--dqn_train', type=str2bool, default='f')
         parser.add_argument('--dqn_test', type=str2bool, default='f')
+
+        parser.add_argument('--using_cpu', type=str2bool, default='f')
         parser.add_argument('--gpu_id', type=str, default='0')
 
 
@@ -77,11 +79,11 @@ def main():
         parser.add_argument('--remove_short_seq', type=str2bool, default='f')
         parser.add_argument('--short_seq_len_th', type=int, default=20)
 
-        parser.add_argument('--split_data_flag', type=str2bool, default='f')
+        parser.add_argument('--split_data_flag', type=str2bool, default='t')
         
         ########## DKVMN ##########
         parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
-        parser.add_argument('--num_epochs', type=int, default=2)
+        parser.add_argument('--num_epochs', type=int, default=100)
         parser.add_argument('--init_from', type=str2bool, default='t')
         parser.add_argument('--show', type=str2bool, default='f')
         parser.add_argument('--early_stop', type=str2bool, default='f')
@@ -90,7 +92,7 @@ def main():
         parser.add_argument('--anneal_interval', type=int, default=20)
         parser.add_argument('--maxgradnorm', type=float, default=50.0)
         parser.add_argument('--momentum', type=float, default=0.9)
-        parser.add_argument('--initial_lr', type=float, default=0.05)
+        parser.add_argument('--initial_lr', type=float, default=0.6)
 
         parser.add_argument('--dkvmn_checkpoint_dir', type=str, default='DKVMN/checkpoint')
         parser.add_argument('--dkvmn_log_dir', type=str, default='DKVMN/log')
@@ -105,10 +107,10 @@ def main():
 
 
         ########## Modified DKVMN ##########
-        parser.add_argument('--knowledge_growth', type=str, choices=['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'], default='value_matrix')
-        parser.add_argument('--add_signal_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
+        parser.add_argument('--knowledge_growth', type=str, choices=['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'], default='origin')
+        parser.add_argument('--add_signal_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='tanh')
         parser.add_argument('--erase_signal_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
-        parser.add_argument('--summary_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='sigmoid')
+        parser.add_argument('--summary_activation', type=str, choices=['tanh', 'sigmoid', 'relu'], default='tanh')
         
         parser.add_argument('--write_type', type=str, choices=['add_off_erase_off', 'add_off_erase_on', 'add_on_erase_off', 'add_on_erase_on'], default='add_on_erase_on')
 
@@ -157,10 +159,10 @@ def main():
         parser.add_argument('--dqn_checkpoint_dir', type=str, default='DQN/checkpoint')
         parser.add_argument('--dqn_tb_log_dir', type=str, default='DQN/tb_log')
 
-        parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='value')
-        parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='value')
+        parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='mastery')
+        parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='mastery')
         parser.add_argument('--test_policy_type', type=str, choices=['random', 'dqn', 'prob_max', 'prob_min'], default='dqn')
-        parser.add_argument('--terminal_condition_type', type=str, choices=['pos_mastery', 'posneg_mastery', 'when_to_stop'], default='pos_mastery')
+        parser.add_argument('--terminal_condition_type', type=str, choices=['pos_mastery', 'posneg_mastery', 'when_to_stop'], default='posneg_mastery')
 
         parser.add_argument('--num_test_episode', type=int, default=100)
 
@@ -191,10 +193,14 @@ def main():
         if not os.path.exists(myArgs.dqn_tb_log_dir):
             os.makedirs(myArgs.dqn_tb_log_dir)
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = myArgs.gpu_id 
         run_config = tf.ConfigProto()
-        #run_config.log_device_placement = True
-        run_config.gpu_options.allow_growth = True
+
+        if myArgs.using_cpu == True:
+            os.environ["CUDA_VISIBLE_DEVICES"] = '-1' 
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = myArgs.gpu_id 
+            #run_config.log_device_placement = True
+            run_config.gpu_options.allow_growth = True
 
 
         if myArgs.dkvmn_train or myArgs.dkvmn_test or myArgs.dkvmn_clustering_actions or myArgs.clustered_dkvmn_train or myArgs.clustered_dkvmn_test or myArgs.dkvmn_analysis or myArgs.dkvmn_ideal_test: 
