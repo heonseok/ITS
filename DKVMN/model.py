@@ -25,8 +25,6 @@ class DKVMNModel(_model.Mixin):
         #tf.set_random_seed(224)
         self.logger = dkvmn_utils.set_logger('DKVMN', 'dkvmn.log', self.args.logging_level)
 
-        self.logger.info('#'*120)
-        self.logger.info(self.model_dir)
 
         self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
         
@@ -52,6 +50,9 @@ class DKVMNModel(_model.Mixin):
     def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir='', selected_mastery_index=-1):
         #np.random.seed(224)
         # q_data, qa_data : [samples, seq_len]
+        self.logger.info('#'*120)
+        self.logger.info(self.model_dir)
+        self.logger.info('Train')
 
         training_step = train_q_data.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
@@ -196,6 +197,10 @@ class DKVMNModel(_model.Mixin):
         return best_epoch    
     
     def test(self, test_q, test_qa, checkpoint_dir='', selected_mastery_index=-1):
+        self.logger.info('#'*120)
+        self.logger.info(self.model_dir)
+        self.logger.info('Test')
+
         steps = test_q.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
         if self.load(checkpoint_dir):

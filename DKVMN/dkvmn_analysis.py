@@ -26,7 +26,22 @@ class DKVMNAnalyzer():
         self.logger = dkvmn_utils.set_logger('aDKVMN', 'dkvmn_analysis.log', self.args.logging_level)
         self.logger.debug('Initializing DKVMN Analyzer')
 
-    def test1(self):
+    
+    def test1_1(self):
+        self.logger.info('#'*120)
+        self.logger.info(self.dkvmn.model_dir)
+        self.logger.info('Test 1-1')
+
+        self.test1_base(1)
+    
+    def test1_2(self):
+        self.logger.info('#'*120)
+        self.logger.info(self.dkvmn.model_dir)
+        self.logger.info('Test 1-2')
+
+        self.test1_base(0)
+        
+    def test1_base(self, answer_type):
         '''
         Positive sensitivity of overall questions
         '''
@@ -35,9 +50,11 @@ class DKVMNAnalyzer():
         init_value_matrix = self.dkvmn.get_init_value_matrix()
         init_probs = self.dkvmn.get_prediction_probability(init_value_matrix)
         
-        answer = self.dkvmn.expand_dims(1)
-        neg_counter = 0
+        answer = self.dkvmn.expand_dims(answer_type)
+        skill_counter = 0
+        right_update_skill_counter = 0
 
+        self.logger.info('Action, prob, diff, diff_avg, wrong_response')
         for action_idx in range(self.num_actions):
 
             action = self.dkvmn.expand_dims(action_idx+1)
@@ -48,10 +65,29 @@ class DKVMNAnalyzer():
             probs_diff_action = probs_diff[action_idx]
             probs_diff_avg = np.average(probs_diff)
 
-            if probs_diff_avg < 0:
-                neg_counter += 1
-            
-            self.logger.info('Action: {:>3}, prob: {: .4f}, diff: {: .4f}, overall_diff: {: .4f}'.format(action_idx, init_probs[action_idx], probs_diff_action, probs_diff_avg))
+            if answer_type == 1:
+                wrong_response = np.sum(probs_diff < 0)
+                '''
+                if probs_diff_avg < 0:
+                    skill_counter += 1
+                '''
 
-        self.logger.info('Number of negative update skills: {}'.format(neg_counter))
+            elif answer_type == 0:
+                wrong_response = np.sum(probs_diff > 0)
+                '''
+                if probs_diff_avg > 0:
+                    skill_counter += 1
+                '''
 
+            if wrong_response == 0:
+                right_update_skill_counter += 1
+
+
+            self.logger.info('{:>3}, {: .4f}, {: .4f}, {: .4f}, {}'.format(action_idx+1, init_probs[action_idx], probs_diff_action, probs_diff_avg, wrong_response))
+
+        #self.logger.info('Total number of wrong update skills: {}'.format(skill_counter))
+        self.logger.info('Number of right update skills : {}'.format(right_update_skill_counter))
+
+
+    def test2(self):
+        pass

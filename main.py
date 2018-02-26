@@ -265,7 +265,7 @@ def main():
                 myArgs.batch_size = 1
                 myArgs.seq_len = 1
                 aDKVMN = DKVMNAnalyzer(myArgs, sess, dkvmn)
-                aDKVMN.test1()
+                aDKVMN.test1_1()
     
             if myArgs.dkvmn_ideal_test:
                 myArgs.batch_size = 1
