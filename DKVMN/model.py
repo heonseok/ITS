@@ -354,7 +354,7 @@ class DKVMNModel(_model.Mixin):
     def model_dir(self):
         network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_Counter_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.using_counter)
  
-        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on':
+        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on_Counter_False':
             network_spec = 'Original'
 
         hyper_parameters = '_lr{}_{}epochs'.format(self.args.initial_lr, self.args.num_epochs)
@@ -363,7 +363,8 @@ class DKVMNModel(_model.Mixin):
         #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
         remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
         
-        return self.args.prefix + network_spec + network_detail + remove_short
+        return self.args.prefix + network_spec + network_detail 
+        #return self.args.prefix + network_spec + network_detail + remove_short
 
 
     def load(self, checkpoint_dir=''):

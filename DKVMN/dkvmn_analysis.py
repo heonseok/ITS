@@ -83,7 +83,7 @@ class DKVMNAnalyzer():
                 right_update_skill_counter += 1
 
 
-            self.logger.info('{:>3}, {: .4f}, {: .4f}, {: .4f}, {}'.format(action_idx+1, init_probs[action_idx], probs_diff_action, probs_diff_avg, wrong_response))
+            self.logger.info('{:>3}, {: .4f}, {: .4f}, {: .4f}, {:>3}'.format(action_idx+1, init_probs[action_idx], probs_diff_action, probs_diff_avg, wrong_response))
 
         #self.logger.info('Total number of wrong update skills: {}'.format(skill_counter))
         self.logger.info('Number of right update skills : {}'.format(right_update_skill_counter))
