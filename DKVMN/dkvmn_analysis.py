@@ -41,10 +41,27 @@ class DKVMNAnalyzer():
 
         self.test1_base(0)
         
+    def test2_1(self):
+        self.logger.info('#'*120)
+        self.logger.info(self.dkvmn.model_dir)
+        self.logger.info('Test 2-1')
+
+        self.test2_base(1)
+        
+    def test2_2(self):
+        self.logger.info('#'*120)
+        self.logger.info(self.dkvmn.model_dir)
+        self.logger.info('Test 2-2')
+
+        self.test2_base(0)
+
+
     def test1_base(self, answer_type):
         '''
-        Positive sensitivity of overall questions
+        Reponse of one action 
         '''
+        th_list = [0, 0.001, 0.01]
+
         self.dkvmn.load()
 
         init_value_matrix = self.dkvmn.get_init_value_matrix()
@@ -52,9 +69,13 @@ class DKVMNAnalyzer():
         
         answer = self.dkvmn.expand_dims(answer_type)
         skill_counter = 0
-        right_update_skill_counter = 0
+        right_updated_skill_counter = 0
 
         self.logger.info('Action, prob, diff, diff_avg, wrong_response')
+
+        wrong_response = np.zeros_like(th_list, dtype=np.int32)
+        right_updated_skill_counter = np.zeros_like(th_list, dtype=np.int32)
+
         for action_idx in range(self.num_actions):
 
             action = self.dkvmn.expand_dims(action_idx+1)
@@ -65,29 +86,55 @@ class DKVMNAnalyzer():
             probs_diff_action = probs_diff[action_idx]
             probs_diff_avg = np.average(probs_diff)
 
-            if answer_type == 1:
-                wrong_response = np.sum(probs_diff < 0)
-                '''
-                if probs_diff_avg < 0:
-                    skill_counter += 1
-                '''
+            for idx, th in enumerate(th_list):
+                if answer_type == 1:
+                    wrong_response[idx] = np.sum(probs_diff < -th)
 
-            elif answer_type == 0:
-                wrong_response = np.sum(probs_diff > 0)
-                '''
-                if probs_diff_avg > 0:
-                    skill_counter += 1
-                '''
+                    '''
+                    if probs_diff_avg < 0:
+                        skill_counter += 1
+                    '''
 
-            if wrong_response == 0:
-                right_update_skill_counter += 1
+                elif answer_type == 0:
+                    wrong_response[idx] = np.sum(probs_diff > th)
 
+                    '''
+                    if probs_diff_avg > 0:
+                        skill_counter += 1
+                    '''
 
-            self.logger.info('{:>3}, {: .4f}, {: .4f}, {: .4f}, {:>3}'.format(action_idx+1, init_probs[action_idx], probs_diff_action, probs_diff_avg, wrong_response))
-
-        #self.logger.info('Total number of wrong update skills: {}'.format(skill_counter))
-        self.logger.info('Number of right update skills : {}'.format(right_update_skill_counter))
+                if wrong_response[idx] == 0:
+                    right_updated_skill_counter[idx] += 1
 
 
-    def test2(self):
+                self.logger.info('{:>3}, {: .4f}, {: .4f}, {: .4f}, {:>3d}, {:>3d}, {:>3d}'.format(action_idx+1, init_probs[action_idx], probs_diff_action, probs_diff_avg, wrong_response[0], wrong_response[1], wrong_response[2]))
+
+        #self.logger.info('Total number of wrong updated skills: {}'.format(skill_counter))
+        self.logger.info('Number of right updated skills : {}, {}, {}'.format(right_updated_skill_counter[0],right_updated_skill_counter[1],right_updated_skill_counter[2]))
+
+
+    def test2_base(self, answer_type):
+        ''' 
+        Response of repeated action 
+        '''
+        repeat_num = 10
+
+        self.dkvmn.load()
+
+        init_value_matrix = self.dkvmn.get_init_value_matrix()
+        init_probs = self.dkvmn.get_prediction_probability(init_value_matrix)
+        answer = self.dkvmn.expand_dims(answer_type)
+
+        for action_idx in range(self.num_actions):
+            action = self.dkvmn.expand_dims(action_idx+1)
+            value_matrix = init_value_matrix
+
+            prob_list = list()
+            prob_list.append('{:.4f}'.format(init_probs[action_idx]))
+            for repeat_idx in range(repeat_num):
+                value_matrix = self.dkvmn.update_value_matrix(value_matrix, action, answer)
+                probs = self.dkvmn.get_prediction_probability(value_matrix)
+                prob_list.append('{:.4f}'.format(probs[action_idx]))
+            #print(','.join(prob_list))
+            self.logger.info('{:>3}, {}'.format(action_idx+1, ','.join(prob_list)))
         pass

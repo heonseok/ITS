@@ -90,8 +90,8 @@ class DATA_Analyzer():
         #print('Total access array')
         histogram = ''
         for idx in range(self.n_questions):
-            histogram +=  '{} : {}\n'.format(idx+1, total_access_arr[idx])
-            self.logger.debug('{} : {}'.format(idx+1, total_access_arr[idx]))
+            histogram +=  '{} , {}\n'.format(idx+1, total_access_arr[idx])
+            self.logger.debug('{} , {}'.format(idx+1, total_access_arr[idx]))
 
         total_access_count = str(np.sum(total_access_arr))
         #print('Total number of access : {}'.format(np.sum(total_access_arr)))

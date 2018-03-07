@@ -79,7 +79,7 @@ def main():
         parser.add_argument('--remove_short_seq', type=str2bool, default='f')
         parser.add_argument('--short_seq_len_th', type=int, default=20)
 
-        parser.add_argument('--split_data_flag', type=str2bool, default='t')
+        parser.add_argument('--split_data_flag', type=str2bool, default='f')
         
         ########## DKVMN ##########
         parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
@@ -265,7 +265,7 @@ def main():
                 myArgs.batch_size = 1
                 myArgs.seq_len = 1
                 aDKVMN = DKVMNAnalyzer(myArgs, sess, dkvmn)
-                aDKVMN.test1_1()
+                aDKVMN.test2_1()
     
             if myArgs.dkvmn_ideal_test:
                 myArgs.batch_size = 1
