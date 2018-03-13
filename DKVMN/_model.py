@@ -166,9 +166,9 @@ class Mixin:
 
     def build_model(self):
         # 'seq_len' means question sequences
-        self.q_data_seq = tf.placeholder(tf.int32, [None, self.args.seq_len], name='q_data_seq') 
-        self.qa_data_seq = tf.placeholder(tf.int32, [None, self.args.seq_len], name='qa_data')
-        self.target_seq = tf.placeholder(tf.float32, [None, self.args.seq_len], name='target')
+        self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
+        self.qa_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='qa_data')
+        self.target_seq = tf.placeholder(tf.float32, [self.args.batch_size, self.args.seq_len], name='target')
 
         self.selected_mastery_index = tf.placeholder(tf.int32, name='selected_mastery_index')
 
@@ -179,6 +179,7 @@ class Mixin:
             
         slice_q_data = tf.split(self.q_data_seq, self.args.seq_len, 1) 
         slice_qa_data = tf.split(self.qa_data_seq, self.args.seq_len, 1) 
+        slice_target = tf.split(self.target_seq, self.args.seq_len, 1)
 
         
         prediction = list()
@@ -190,18 +191,23 @@ class Mixin:
         #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
         #mastery_level_list.append(mastery_level)
 
+        q_counter  = tf.get_variable('q_counter', [self.args.batch_size, self.args.n_questions+1], dtype=tf.int32, initializer=tf.zeros_initializer, trainable=False)
+        counter_loss = 0
+
         # Logics
         for i in range(self.args.seq_len):
 
             q = tf.squeeze(slice_q_data[i], 1)
+
             qa = tf.squeeze(slice_qa_data[i], 1)
+            target = tf.squeeze(slice_target[i], 1)
             a = tf.cast(tf.greater(qa, tf.constant(self.args.n_questions)), tf.float32)
 
             #one_hot_q = tf.one_hot(q, self.args.n_questions)
             #counter = counter + one_hot_q
 
             q_embed = self.embedding_q(q)
-            counter = counter + q_embed
+            #counter = counter + q_embed
             qa_embed = self.embedding_qa(qa)
 
             correlation_weight = self.memory.attention(q_embed)
@@ -217,6 +223,18 @@ class Mixin:
             self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
             mastery_level = self.calculate_mastery_level(self.memory.memory_value)
             mastery_level_list.append(mastery_level)
+
+
+            ## calculate counter loss
+            ## TODO : remove -1 target.
+            valid_idx = tf.where(tf.not_equal(target, tf.constant(-1, dtype=tf.float32)))
+            valid_q = tf.gather(q, valid_idx)
+
+            p = tf.sigmoid(prev_pred_logit) 
+            couter_loss = tf.cast(tf.gather(q_counter,valid_q), tf.float32) * (1-p)
+
+            q_one_hot = tf.one_hot(valid_q, self.args.n_questions+1, dtype=tf.int32)
+            q_counter += q_one_hot 
             
         self.mastery_level_seq = mastery_level_list
         #self.prediction_seq = tf.sigmoid(prediction) 
@@ -240,7 +258,7 @@ class Mixin:
         filtered_logits = tf.gather(pred_logits_1d, index)
 
 
-        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
+        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target)) + 0.1*counter_loss
         #self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
 
         # Optimizer : SGD + MOMENTUM with learning rate decay

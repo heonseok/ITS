@@ -203,7 +203,7 @@ def main():
             run_config.gpu_options.allow_growth = True
 
 
-        if myArgs.dkvmn_train or myArgs.dkvmn_test or myArgs.dkvmn_clustering_actions or myArgs.clustered_dkvmn_train or myArgs.clustered_dkvmn_test or myArgs.dkvmn_analysis or myArgs.dkvmn_ideal_test: 
+        if myArgs.dkvmn_train or myArgs.dkvmn_test or myArgs.dkvmn_clustering_actions or myArgs.clustered_dkvmn_train or myArgs.clustered_dkvmn_test or myArgs.dkvmn_ideal_test: 
             ### Split data 
             data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)
             data_path = os.path.join(data_directory, myArgs.data_name + '_data.csv')
@@ -226,6 +226,7 @@ def main():
 
             train_data = np.load(train_data_path)
             train_q_data = train_data['q']
+            #print(train_q_data)
             train_qa_data = train_data['qa']
 
             #print('Number of train_q_data: {}'.format(len(train_q_data)))
@@ -265,7 +266,8 @@ def main():
                 myArgs.batch_size = 1
                 myArgs.seq_len = 1
                 aDKVMN = DKVMNAnalyzer(myArgs, sess, dkvmn)
-                aDKVMN.test2_1()
+
+                aDKVMN.test()
     
             if myArgs.dkvmn_ideal_test:
                 myArgs.batch_size = 1

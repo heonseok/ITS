@@ -44,12 +44,12 @@ for knowledge_growth in knowledge_growth_list:
                                     args_list.append('python main.py')
 
                                     #args_list.append('--prefix SigEmbedCounter_')
-                                    args_list.append('--prefix lrModified_MS10_')
+                                    #args_list.append('--prefix lrModified_MS10_')
 
-                                    args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f --dqn_train t --dqn_test t')
-                                    args_list.append('--dkvmn_analysis t')
+                                    args_list.append('--dkvmn_train t --dkvmn_test t --dkvmn_ideal_test f --dqn_train f --dqn_test f')
+                                    args_list.append('--dkvmn_analysis f')
                                     args_list.append('--gpu_id 0')
-                                    args_list.append('--logging_level DEBUG')
+                                    args_list.append('--logging_level INFO')
 
                                     args_list.append('--test_policy_type')
                                     args_list.append(policy_type)

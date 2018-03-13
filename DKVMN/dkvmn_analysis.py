@@ -26,33 +26,27 @@ class DKVMNAnalyzer():
         self.logger = dkvmn_utils.set_logger('aDKVMN', 'dkvmn_analysis.log', self.args.logging_level)
         self.logger.debug('Initializing DKVMN Analyzer')
 
-    
-    def test1_1(self):
+    def test(self):
         self.logger.info('#'*120)
         self.logger.info(self.dkvmn.model_dir)
-        self.logger.info('Test 1-1')
 
+        self.test1_1()
+        self.test2_1()
+    
+    def test1_1(self):
+        self.logger.info('Test 1-1')
         self.test1_base(1)
     
     def test1_2(self):
-        self.logger.info('#'*120)
-        self.logger.info(self.dkvmn.model_dir)
         self.logger.info('Test 1-2')
-
         self.test1_base(0)
         
     def test2_1(self):
-        self.logger.info('#'*120)
-        self.logger.info(self.dkvmn.model_dir)
         self.logger.info('Test 2-1')
-
         self.test2_base(1)
         
     def test2_2(self):
-        self.logger.info('#'*120)
-        self.logger.info(self.dkvmn.model_dir)
         self.logger.info('Test 2-2')
-
         self.test2_base(0)
 
 
@@ -107,7 +101,7 @@ class DKVMNAnalyzer():
                     right_updated_skill_counter[idx] += 1
 
 
-                self.logger.info('{:>3}, {: .4f}, {: .4f}, {: .4f}, {:>3d}, {:>3d}, {:>3d}'.format(action_idx+1, init_probs[action_idx], probs_diff_action, probs_diff_avg, wrong_response[0], wrong_response[1], wrong_response[2]))
+            self.logger.info('{:>3}, {: .4f}, {: .4f}, {: .4f}, {:>3d}, {:>3d}, {:>3d}'.format(action_idx+1, init_probs[action_idx], probs_diff_action, probs_diff_avg, wrong_response[0], wrong_response[1], wrong_response[2]))
 
         #self.logger.info('Total number of wrong updated skills: {}'.format(skill_counter))
         self.logger.info('Number of right updated skills : {}, {}, {}'.format(right_updated_skill_counter[0],right_updated_skill_counter[1],right_updated_skill_counter[2]))
