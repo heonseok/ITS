@@ -191,8 +191,8 @@ class Mixin:
         #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
         #mastery_level_list.append(mastery_level)
 
-        q_counter  = tf.get_variable('q_counter', [self.args.batch_size, self.args.n_questions+1], dtype=tf.int32, initializer=tf.zeros_initializer, trainable=False)
-        counter_loss = 0
+        self.q_counter  = tf.get_variable('self.q_counter', [self.args.batch_size, self.args.n_questions+1], dtype=tf.int32, initializer=tf.zeros_initializer, trainable=False)
+        self.counter_loss = 0
 
         # Logics
         for i in range(self.args.seq_len):
@@ -231,10 +231,11 @@ class Mixin:
             valid_q = tf.gather(q, valid_idx)
 
             p = tf.sigmoid(prev_pred_logit) 
-            couter_loss = tf.cast(tf.gather(q_counter,valid_q), tf.float32) * (1-p)
+            couter_loss = tf.cast(tf.gather(self.q_counter,valid_q), tf.float32) * (-p * tf.log(p)) 
+            #couter_loss = tf.cast(tf.gather(self.q_counter,valid_q), tf.float32) * (1-p)
 
             q_one_hot = tf.one_hot(valid_q, self.args.n_questions+1, dtype=tf.int32)
-            q_counter += q_one_hot 
+            self.q_counter += q_one_hot 
             
         self.mastery_level_seq = mastery_level_list
         #self.prediction_seq = tf.sigmoid(prediction) 
@@ -258,7 +259,7 @@ class Mixin:
         filtered_logits = tf.gather(pred_logits_1d, index)
 
 
-        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target)) + 0.1*counter_loss
+        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target)) + 0.1*self.counter_loss
         #self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
 
         # Optimizer : SGD + MOMENTUM with learning rate decay
