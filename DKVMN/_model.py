@@ -231,7 +231,7 @@ class Mixin:
             valid_q = tf.gather(q, valid_idx)
 
             p = tf.sigmoid(prev_pred_logit) 
-            couter_loss = tf.cast(tf.gather(self.q_counter,valid_q), tf.float32) * (-p * tf.log(p)) 
+            self.couter_loss = tf.cast(tf.gather(self.q_counter,valid_q), tf.float32) * (-p * tf.log(p)) 
             #couter_loss = tf.cast(tf.gather(self.q_counter,valid_q), tf.float32) * (1-p)
 
             q_one_hot = tf.one_hot(valid_q, self.args.n_questions+1, dtype=tf.int32)

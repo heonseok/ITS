@@ -363,6 +363,8 @@ class DKVMNModel(_model.Mixin):
         #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
         remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
         
+        batch = '_batch_{}'.format(self.args.batch_size) 
+        
         return self.args.prefix + network_spec + network_detail 
         #return self.args.prefix + network_spec + network_detail + remove_short
 
