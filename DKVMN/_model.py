@@ -185,7 +185,7 @@ class Mixin:
         prediction = list()
         mastery_level_list = list()
 
-        counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
+        #counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
         #counter = tf.zeros([self.args.batch_size, self.args.n_questions])
 
         #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
@@ -194,10 +194,15 @@ class Mixin:
         self.q_counter  = tf.get_variable('self.q_counter', [self.args.batch_size, self.args.n_questions+1], dtype=tf.int32, initializer=tf.zeros_initializer, trainable=False)
         self.counter_loss = 0
 
+        q_constant = tf.constant(np.arange(self.args.batch_size), dtype=tf.int32)
         # Logics
         for i in range(self.args.seq_len):
 
             q = tf.squeeze(slice_q_data[i], 1)
+            #print('q : ' + str(q.shape))
+            
+            q_concat = tf.stack([q_constant, q], axis=1)
+            #print('q_concat : ' + str(q_concat.shape))
 
             qa = tf.squeeze(slice_qa_data[i], 1)
             target = tf.squeeze(slice_target[i], 1)
@@ -228,13 +233,28 @@ class Mixin:
             ## calculate counter loss
             ## TODO : remove -1 target.
             valid_idx = tf.where(tf.not_equal(target, tf.constant(-1, dtype=tf.float32)))
+            #print('valid_idx : ' + str(valid_idx))
             valid_q = tf.gather(q, valid_idx)
+            #valid_q = tf.squeeze(tf.gather(q, valid_idx))
+            #print('valid_q : ' + str(valid_q))
 
             p = tf.gather(tf.sigmoid(prev_pred_logit) , valid_idx)
-            #print(p.shape)
-            #print((-p*tf.log(p)).shape)
-            #print(tf.gather(self.q_counter,valid_q).shape)
-            self.counter_loss = tf.reduce_mean(tf.squeeze(tf.cast(tf.gather(self.q_counter,valid_q, axis=1), tf.float32)) * tf.squeeze((-p * tf.log(p))))
+            '''
+            print(p.shape)
+            print((-p*tf.log(p)).shape)
+            print(tf.gather(self.q_counter,valid_q, axis=0).shape)
+            print(tf.gather(self.q_counter,valid_q, axis=1).shape)
+            print(tf.gather(self.q_counter,valid_q, axis=2).shape)
+            '''
+
+            valid_counter = tf.gather_nd(self.q_counter, q_concat)
+            #print('valid_counter : ' + str(valid_counter))
+            valid_counter = tf.gather(valid_counter, valid_idx)
+            #print('valid_counter : ' + str(valid_counter))
+            #print('entropy')
+            #print( (tf.squeeze(-p*tf.log(p))).shape)
+            self.counter_loss += tf.reduce_mean(tf.cast(valid_counter, tf.float32) * tf.squeeze((-p * tf.log(p))))
+            #self.counter_loss += tf.reduce_mean(tf.squeeze(tf.cast(tf.gather(self.q_counter,valid_q, axis=1), tf.float32)) * tf.squeeze((-p * tf.log(p))))
 
             #couter_loss = tf.cast(tf.gather(self.q_counter,valid_q), tf.float32) * (1-p)
 
