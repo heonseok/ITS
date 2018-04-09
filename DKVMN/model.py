@@ -356,16 +356,16 @@ class DKVMNModel(_model.Mixin):
 
     @property
     def model_dir(self):
-        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_cLossWeight_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_activation, self.args.erase_activation, self.args.write_type, self.args.counter_loss_weight)
+        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_cLossWeight_{}_Counter_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_activation, self.args.erase_activation, self.args.write_type, self.args.counter_loss_weight, self.args.using_counter_graph)
  
-        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on_cLossWeight_0.0':
+        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on_cLossWeight_0.0_Counter_False':
             network_spec = 'Original'
 
         hyper_parameters = '_lr{}_{}epochs'.format(self.args.initial_lr, self.args.num_epochs)
         network_detail = '_MemSize{}'.format(self.args.memory_size)
         #hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
         #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
-        remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
+        #remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
         
         batch = '_batch_{}'.format(self.args.batch_size) 
         
