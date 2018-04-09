@@ -23,14 +23,14 @@ class DKVMNAnalyzer():
         self.dkvmn.build_step_graph()
         self.num_actions = self.args.n_questions
 
-        self.logger = dkvmn_utils.set_logger('aDKVMN', 'dkvmn_analysis.log', self.args.logging_level)
+        self.logger = dkvmn_utils.set_logger('aDKVMN', self.args.prefix + 'dkvmn_analysis.log', self.args.logging_level)
         self.logger.debug('Initializing DKVMN Analyzer')
 
     def test(self):
         self.logger.info('#'*120)
         self.logger.info(self.dkvmn.model_dir)
 
-        self.test1_1()
+        #self.test1_1()
         self.test2_1()
     
     def test1_1(self):
@@ -58,8 +58,9 @@ class DKVMNAnalyzer():
 
         self.dkvmn.load()
 
+        init_counter = self.dkvmn.get_init_counter()
         init_value_matrix = self.dkvmn.get_init_value_matrix()
-        init_probs = self.dkvmn.get_prediction_probability(init_value_matrix)
+        init_probs = self.dkvmn.get_prediction_probability(init_value_matrix, init_counter)
         
         answer = self.dkvmn.expand_dims(answer_type)
         skill_counter = 0
@@ -73,8 +74,23 @@ class DKVMNAnalyzer():
         for action_idx in range(self.num_actions):
 
             action = self.dkvmn.expand_dims(action_idx+1)
-            value_matrix = self.dkvmn.update_value_matrix(init_value_matrix, action, answer)
-            probs = self.dkvmn.get_prediction_probability(value_matrix)
+            value_matrix = self.dkvmn.update_value_matrix(init_value_matrix, action, answer, init_counter)
+            
+            counter = np.copy(init_counter)
+            '''
+            print('I')
+            print(init_counter)
+            print('C')
+            print(counter)
+            '''
+            counter[0,action_idx + 1] += 1
+            '''
+            print('C_')
+            print(counter)
+            '''
+            # TODO : check init_counter is correct. counter_with_incrase_one? 
+            probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
+            #probs = self.dkvmn.get_prediction_probability(value_matrix, init_counter)
 
             probs_diff = probs - init_probs
             probs_diff_action = probs_diff[action_idx]
@@ -111,24 +127,30 @@ class DKVMNAnalyzer():
         ''' 
         Response of repeated action 
         '''
+        # TODO : implement a counter
         repeat_num = 10
 
         self.dkvmn.load()
 
+        init_counter = self.dkvmn.get_init_counter()
         init_value_matrix = self.dkvmn.get_init_value_matrix()
-        init_probs = self.dkvmn.get_prediction_probability(init_value_matrix)
+        init_probs = self.dkvmn.get_prediction_probability(init_value_matrix, init_counter)
         answer = self.dkvmn.expand_dims(answer_type)
 
         for action_idx in range(self.num_actions):
             action = self.dkvmn.expand_dims(action_idx+1)
             value_matrix = init_value_matrix
+            counter = np.copy(init_counter)
 
             prob_list = list()
             prob_list.append('{:.4f}'.format(init_probs[action_idx]))
             for repeat_idx in range(repeat_num):
-                value_matrix = self.dkvmn.update_value_matrix(value_matrix, action, answer)
-                probs = self.dkvmn.get_prediction_probability(value_matrix)
+                value_matrix = self.dkvmn.update_value_matrix(value_matrix, action, answer, counter)
+                probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
                 prob_list.append('{:.4f}'.format(probs[action_idx]))
+                counter[0,action_idx + 1] += 1
+                #print(np.sum([action_idx]))
             #print(','.join(prob_list))
             self.logger.info('{:>3}, {}'.format(action_idx+1, ','.join(prob_list)))
-        pass
+
+            

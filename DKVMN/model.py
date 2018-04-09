@@ -23,7 +23,7 @@ class DKVMNModel(_model.Mixin):
         self.sess = sess
 
         #tf.set_random_seed(224)
-        self.logger = dkvmn_utils.set_logger('DKVMN', 'dkvmn.log', self.args.logging_level)
+        self.logger = dkvmn_utils.set_logger('DKVMN', self.args.prefix + 'dkvmn.log', self.args.logging_level)
 
 
         self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
@@ -32,15 +32,18 @@ class DKVMNModel(_model.Mixin):
         self.build_total_prob_graph()
         self.build_mastery_graph()
 
+    def get_init_counter(self):
+        return np.zeros([1,self.args.n_questions+1])  
+
     def get_init_value_matrix(self):
         return self.sess.run(self.init_memory_value)
 
-    def get_prediction_probability(self, value_matrix):
-        return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.total_value_matrix: value_matrix}))
+    def get_prediction_probability(self, value_matrix, counter):
+        return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.total_value_matrix: value_matrix, self.total_counter: counter, self.total_using_counter_graph: self.args.using_counter_graph}))
     
-    def update_value_matrix(self, value_matrix, action, answer):
+    def update_value_matrix(self, value_matrix, action, answer, counter):
        ops = [self.stepped_value_matrix]
-       value_matrix = self.sess.run(ops, feed_dict={self.q: action, self.a: answer, self.value_matrix: value_matrix})
+       value_matrix = self.sess.run(ops, feed_dict={self.q: action, self.a: answer, self.value_matrix: value_matrix, self.step_counter: counter, self.step_using_counter_graph: self.args.using_counter_graph})
        return np.squeeze(value_matrix)
 
     def expand_dims(self, val):
@@ -118,7 +121,7 @@ class DKVMNModel(_model.Mixin):
                 target_batch = (target - 1) // self.args.n_questions  
                 target_batch = target_batch.astype(np.float)
 
-                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr, self.selected_mastery_index:selected_mastery_index, self.using_counter:self.args.using_counter}
+                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr, self.selected_mastery_index:selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
                 loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
 
                 pred_ = pred_[:,selected_mastery_index+1:] 
@@ -161,7 +164,7 @@ class DKVMNModel(_model.Mixin):
                 # right : 1, wrong : 0, padding : -1
                 valid_target = (valid_qa - 1) // self.args.n_questions
                 valid_target = valid_target.astype(np.float)
-                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target, self.selected_mastery_index:selected_mastery_index, self.using_counter:self.args.using_counter}
+                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target, self.selected_mastery_index:selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
                 valid_loss, valid_pred = self.sess.run([self.loss, self.pred], feed_dict=valid_feed_dict)
                 # Same with training set
 
@@ -194,6 +197,7 @@ class DKVMNModel(_model.Mixin):
                 self.logger.debug('Eearly stop')
                 return best_epoch
 
+        self.logger.info('Number of non-update epochs: {}'.format(early_stop_counter))
         return best_epoch    
     
     def test(self, test_q, test_qa, checkpoint_dir='', selected_mastery_index=-1):
@@ -221,7 +225,7 @@ class DKVMNModel(_model.Mixin):
             target = target.astype(np.int)
             target_batch = (target - 1) // self.args.n_questions  
             target_batch = target_batch.astype(np.float)
-            feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch, self.selected_mastery_index:selected_mastery_index, self.using_counter:self.args.using_counter}
+            feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch, self.selected_mastery_index:selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
             loss_, pred_ = self.sess.run([self.loss, self.pred], feed_dict=feed_dict)
             # Get right answer index
             # Make [batch size * seq_len, 1]
@@ -352,9 +356,9 @@ class DKVMNModel(_model.Mixin):
 
     @property
     def model_dir(self):
-        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_Counter_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_signal_activation, self.args.erase_signal_activation, self.args.write_type, self.args.using_counter)
+        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_cLossWeight_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_activation, self.args.erase_activation, self.args.write_type, self.args.counter_loss_weight)
  
-        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on_Counter_False':
+        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on_cLossWeight_0.0':
             network_spec = 'Original'
 
         hyper_parameters = '_lr{}_{}epochs'.format(self.args.initial_lr, self.args.num_epochs)
