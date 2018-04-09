@@ -249,11 +249,17 @@ class Mixin:
 
             valid_counter = tf.gather_nd(self.q_counter, q_concat)
             #print('valid_counter : ' + str(valid_counter))
-            valid_counter = tf.gather(valid_counter, valid_idx)
+            valid_counter = tf.squeeze(tf.gather(valid_counter, valid_idx))
             #print('valid_counter : ' + str(valid_counter))
             #print('entropy')
             #print( (tf.squeeze(-p*tf.log(p))).shape)
-            self.counter_loss += tf.reduce_mean(tf.cast(valid_counter, tf.float32) * tf.squeeze((-p * tf.log(p))))
+            #loss_term = tf.squeeze((-p * tf.log(p)))
+            loss_term = tf.squeeze(tf.square(1-p))
+            #print(loss_term.shape)
+            #print(tf.squeeze(loss_term).shape)
+            #print(tf.squeeze(valid_counter).shape)
+            self.counter_loss += tf.reduce_mean(tf.cast(valid_counter, tf.float32) * loss_term)
+
             #self.counter_loss += tf.reduce_mean(tf.squeeze(tf.cast(tf.gather(self.q_counter,valid_q, axis=1), tf.float32)) * tf.squeeze((-p * tf.log(p))))
 
             #couter_loss = tf.cast(tf.gather(self.q_counter,valid_q), tf.float32) * (1-p)

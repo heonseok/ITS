@@ -19,7 +19,7 @@ write_type_list = ['add_off_erase_on']
 learning_rate_list = [0.6]
 # 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
 
-counter_loss_weight_list = [0.1]
+counter_loss_weight_list = [0.01]
 #0.0, 0.001, 0.01, 0.1, 1.0
 
 
@@ -51,13 +51,13 @@ for knowledge_growth in knowledge_growth_list:
                                         args_list = []
                                         args_list.append('python main.py')
 
-                                        args_list.append('--prefix nonCounter_')
+                                        args_list.append('--prefix fixedCLoss_')
 
-                                        args_list.append('--dkvmn_train f --dkvmn_test t --dkvmn_ideal_test f')
+                                        args_list.append('--dkvmn_train t --dkvmn_test t --dkvmn_ideal_test f')
                                         args_list.append('--dqn_train f --dqn_test f')
                                         args_list.append('--terminal_condition_type posneg_mastery') 
 
-                                        args_list.append('--using_counter_graph f')
+                                        args_list.append('--using_counter_graph t')
                                         args_list.append('--dkvmn_analysis t')
                                         args_list.append('--dkvmn_clustering_actions f')
 

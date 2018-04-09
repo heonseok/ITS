@@ -57,7 +57,7 @@ for knowledge_growth in knowledge_growth_list:
                                         args_list.append('--dqn_train f --dqn_test f')
                                         args_list.append('--terminal_condition_type posneg_mastery') 
 
-                                        args_list.append('--using_counter f')
+                                        args_list.append('--using_counter_graph f')
                                         args_list.append('--dkvmn_analysis t')
                                         args_list.append('--dkvmn_clustering_actions f')
 
