@@ -12,7 +12,7 @@ class Mixin:
         #q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
         #q_embed_content = tf.tanh(q_embed_content_logit)
 
-        counter_content_logit = operations.linear(tf.cast(counter, tf.float32), 20, name='counter_content')
+        counter_content_logit = operations.linear(tf.cast(counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
         counter_content = tf.sigmoid(counter_content_logit)
 
         mastery_level_prior_difficulty = tf.concat([read_content, q_embed, counter_content], 1)
