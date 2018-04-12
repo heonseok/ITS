@@ -376,10 +376,7 @@ class DKVMNModel(_model.Mixin):
 
         batch = '_batch_{}'.format(self.args.batch_size) 
 
-        if self.args.reapeat_idx == 0:
-            repeat_detail = '' 
-        else: 
-            repeat_detail = '_rIdx_{}'.format(self.args.repeat_idx)
+        repeat_detail = '_rIdx_{}'.format(self.args.repeat_idx)
 
         return network_spec + network_detail + counter_detail + repeat_detail
         #return self.args.prefix + network_spec + network_detail + counter_detail + repeat_detail
