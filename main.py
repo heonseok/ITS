@@ -71,6 +71,7 @@ def main():
         parser.add_argument('--using_cpu', type=str2bool, default='f')
         parser.add_argument('--gpu_id', type=str, default='0')
 
+        parser.add_argument('--repeat_idx', type=int, default=0)
 
         ########## Data preprocessing #########
         parser.add_argument('--remove_infrequent_skill', type=str2bool, default='f')
