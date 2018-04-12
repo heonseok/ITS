@@ -381,7 +381,8 @@ class DKVMNModel(_model.Mixin):
         else: 
             repeat_detail = '_rIdx_{}'.format(self.args.repeat_idx)
 
-        return self.args.prefix + network_spec + network_detail + counter_detail + repeat_detail
+        return network_spec + network_detail + counter_detail + repeat_detail
+        #return self.args.prefix + network_spec + network_detail + counter_detail + repeat_detail
         #return self.args.prefix + network_spec + network_detail + remove_short
 
 
