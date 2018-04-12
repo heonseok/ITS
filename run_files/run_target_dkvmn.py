@@ -2,7 +2,7 @@ import os
 
 #################### DKVMN ####################
 # 'origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'
-knowledge_growth_list = ['origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery']
+knowledge_growth_list = ['summary']
 
 # 'sigmoid', 'tanh', 'relu'
 summary_activation_list = ['sigmoid']
@@ -19,10 +19,10 @@ write_type_list = ['add_on_erase_on']
 learning_rate_list = [0.6]
 # 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
 
-counter_loss_weight_list = [0.0]
+counter_loss_weight_list = [0.0001]
 #0.0, 0.001, 0.01, 0.1, 1.0
 
-counter_embedding_dim_list = [40, 64, 80]
+counter_embedding_dim_list = [64]
 
 #################### DQN ####################
 state_type_list = ['mastery']
@@ -35,7 +35,7 @@ policy_type_list = ['dqn']
 #'dqn', 'random', 'prob_max'
 
 
-repeat_num = 10
+repeat_num = 1 
 
 
 for repeat_idx in range(repeat_num): 
@@ -61,13 +61,13 @@ for repeat_idx in range(repeat_num):
                                                 args_list.append('--prefix squre_')
 
                                                 args_list.append('--repeat_idx')
-                                                arge_list.append(repeat_idx)
+                                                args_list.append(str(repeat_idx))
 
-                                                args_list.append('--dkvmn_train t --dkvmn_test t --dkvmn_ideal_test f')
+                                                args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f')
                                                 args_list.append('--dqn_train f --dqn_test f')
                                                 args_list.append('--terminal_condition_type posneg_mastery') 
 
-                                                args_list.append('--using_counter_graph f')
+                                                args_list.append('--using_counter_graph t')
                                                 args_list.append('--counter_embedding_dim')                    
                                                 args_list.append(str(counter_embedding_dim))
                      
