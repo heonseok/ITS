@@ -73,24 +73,6 @@ class DKVMNAnalyzer():
             elif wrong_response_count > 0:
                 wrong_updated_skill_list.append(action_idx+1)
 
-            '''
-            action = self.dkvmn.expand_dims(action_idx+1)
-            if update_value_matrix_flag == True:
-                value_matrix = self.dkvmn.update_value_matrix(init_value_matrix, action, answer, init_counter)
-            
-            counter = np.copy(init_counter)
-            counter[0,action_idx + 1] += 1
-
-            probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
-
-            probs_diff = probs - init_probs
-        
-            if answer_type == 1:
-                wrong_response = np.sum(probs_diff < 0)
-            elif answer_type == 0:
-                wrong_response = np.sum(probs_diff > 0)
-
-            '''
 
         self.logger.info('{}, {}'.format(answer_type, right_updated_skill_counter))
         self.logger.info('{}'.format(int2str_list(wrong_updated_skill_list)))
@@ -117,12 +99,6 @@ class DKVMNAnalyzer():
         elif answer_type == 0:
             wrong_response_count = np.sum(probs_diff > 0)
 
-        '''
-        if wrong_response_count == 0:
-            right_updated_skill_counter += 1
-        elif wrong_response_count > 0:
-            wrong_updated_skill_list.append(action_idx+1)
-        '''
         return value_matrix, counter, probs, wrong_response_count
 
     def test2_base(self, answer_type, update_value_matrix_flag):
@@ -146,11 +122,6 @@ class DKVMNAnalyzer():
 
             prob_mat[action_idx][0] = init_probs[action_idx]
             for repeat_idx in range(repeat_num):
-                '''
-                if update_value_matrix_flag == True:
-                    value_matrix = self.dkvmn.update_value_matrix(value_matrix, action, answer, counter)
-                probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
-                '''
 
                 value_matrix, counter, probs, _ = self.calc_influence(action_idx, answer_type, value_matrix, counter, update_value_matrix_flag)
                 prob_mat[action_idx][repeat_idx+1] = probs[action_idx]
