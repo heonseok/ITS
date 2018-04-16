@@ -26,7 +26,7 @@ class DKVMNModel(_model.Mixin):
         self.logger = dkvmn_utils.set_logger('DKVMN', self.args.prefix + 'dkvmn.log', self.args.logging_level)
 
 
-        self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
+        #self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
         
         self.build_model()
         self.build_total_prob_graph()
@@ -40,6 +40,9 @@ class DKVMNModel(_model.Mixin):
 
     def get_prediction_probability(self, value_matrix, counter):
         return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.total_value_matrix: value_matrix, self.total_counter: counter, self.total_using_counter_graph: self.args.using_counter_graph}))
+
+    def get_mastery_level(self, value_matrix, counter):
+        return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict={self.mastery_value_matrix: value_matrix, self.mastery_counter: counter, self.mastery_using_counter_graph: self.args.using_counter_graph}))
     
     def update_value_matrix(self, value_matrix, action, answer, counter):
        ops = [self.stepped_value_matrix]
@@ -377,8 +380,13 @@ class DKVMNModel(_model.Mixin):
         batch = '_batch_{}'.format(self.args.batch_size) 
 
         repeat_detail = '_rIdx_{}'.format(self.args.repeat_idx)
-
-        return network_spec + network_detail + counter_detail + repeat_detail
+    
+        if self.args.dataset == 'assist_2009_updated':
+            dataset_detail = ''
+        else:
+            dataset_detail = '_{}'.format(self.args.dataset)
+        
+        return network_spec + network_detail + counter_detail + dataset_detail + repeat_detail
         #return self.args.prefix + network_spec + network_detail + counter_detail + repeat_detail
         #return self.args.prefix + network_spec + network_detail + remove_short
 

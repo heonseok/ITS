@@ -14,10 +14,12 @@ class DKVMNEnvironment():
         self.env = dkvmn 
 
         self.num_actions = self.args.n_questions
-        self.initial_ckpt = np.copy(self.env.memory.memory_value)
+        #self.initial_ckpt = np.copy(self.env.memory.memory_value)
         self.episode_step = 0
 
-        self.value_matrix = self.get_init_value_matrix()  
+        self.value_matrix = self.env.get_init_value_matrix()  
+        self.counter = self.env.get_init_counter()
+
         mastery_level = self.get_mastery_level()
         
         if self.args.state_type == 'value':
@@ -33,18 +35,17 @@ class DKVMNEnvironment():
         self.correct_counter = 0
         self.action_count = 0
 
-    def get_init_value_matrix(self):
-        return self.sess.run(self.env.init_memory_value)
-
     def get_prediction_probability(self):
-        return np.squeeze(self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix}))
+        return self.env.get_prediction_probability(self.value_matrix, self.counter)
+        #return np.squeeze(self.sess.run(self.env.total_pred_probs, feed_dict={self.env.total_value_matrix: self.value_matrix, self.env.total_counter:counter}))
 
     def get_mastery_level(self):
-        return np.squeeze(self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix}))
+        return self.env.get_mastery_level(self.value_matrix, self.counter)
+        #return np.squeeze(self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix}))
 
     def env_status(self):
         probs = self.get_prediction_probability()
-        prev_mastery_level = self.get_mastery_level() 
+        prev_mastery_level = self.env.get_mastery_level() 
 
         answer = np.expand_dims(np.expand_dims(1, axis=0), axis=0)
 
@@ -79,10 +80,11 @@ class DKVMNEnvironment():
         final_value_matrix = self.value_matrix
 
         #self.logger.debug('Final env status')
-        self.env_status()
+        #self.env_status()
 
         ##### init variables #####
-        self.value_matrix = self.get_init_value_matrix()
+        self.value_matrix = self.env.get_init_value_matrix()
+        self.counter = self.env.get_init_counter()
         self.net_correct_arr = np.zeros(self.num_actions)
         self.access_arr = np.zeros(self.num_actions)
         self.correct_counter = 0
@@ -91,7 +93,7 @@ class DKVMNEnvironment():
         starting_mastery_level = self.get_mastery_level()
  
         #self.logger.debug('Starting env status')
-        self.env_status()
+        #self.env_status()
 
         ###### count pos/neg #####
         mastery_level_diff = final_mastery_level - starting_mastery_level
@@ -177,7 +179,7 @@ class DKVMNEnvironment():
             action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
 
             ops = [self.env.stepped_pred_prob]
-            pos_stepped_probs[action_idx] = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})[0]
+            pos_stepped_probs[action_idx] = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix, self.env.step_counter: self.counter, self.env.step_using_counter_graph: self.args.using_counter_graph})[0]
 
         pos_eps_idx = np.absolute(pos_stepped_probs-prev_probs) < 0.01 
         pos_terminal_idx = pos_stepped_probs[pos_eps_idx] > self.args.terminal_threshold
@@ -195,7 +197,7 @@ class DKVMNEnvironment():
             action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
 
             ops = [self.env.stepped_pred_prob]
-            neg_stepped_probs[action_idx] = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})[0]
+            neg_stepped_probs[action_idx] = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix, self.env.step_counter: self.counter, self.env.step_using_counter_graph: self.args.using_counter_graph})[0]
 
         #neg_prev_probs_idx = prev_probs < self.args.terminal_threshold
         neg_eps_idx = np.absolute(neg_stepped_probs-prev_probs) < 0.01 
@@ -229,24 +231,31 @@ class DKVMNEnvironment():
         return action 
 
 
-    def act(self, action):
+    def act(self, action_idx):
 
         self.action_count += 1
-
-        action = np.asarray(action+1, dtype=np.int32)
-        action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
+        
+        self.counter[0, action_idx+1] += 1
+        #print('CCCCCCCCCCCCCCCCCCCCCCCC')
+        #print(self.counter.shape)
+        #print(self.counter)
+        #action = np.asarray(action_idx+1, dtype=np.int32)
+        #action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
+        action = self.env.expand_dims(action_idx+1)
 
         # -1 for sampling 
         # 0, 1 for input given
         # 0 : worst, 1 : best 
-        answer = np.asarray(-1, dtype=np.int32)
-        answer = np.expand_dims(np.expand_dims(answer, axis=0), axis=0)
+        #answer = np.asarray(-1, dtype=np.int32)
+        #answer = np.expand_dims(np.expand_dims(answer, axis=0), axis=0)
+        answer = self.env.expand_dims(-1)
 
         prev_mastery_level = self.get_mastery_level()
 
         ## update value matrix 
         ops = [self.env.stepped_value_matrix, self.env.value_matrix_difference, self.env.read_content_difference, self.env.summary_difference, self.env.qa, self.env.stepped_pred_prob, self.env.pred_prob_difference]
-        self.value_matrix, val_diff, read_diff, summary_diff, qa, stepped_prob, prob_diff = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})
+        feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix, self.env.step_counter: self.counter, self.env.step_using_counter_graph: self.args.using_counter_graph}
+        self.value_matrix, val_diff, read_diff, summary_diff, qa, stepped_prob, prob_diff = self.sess.run(ops, feed_dict=feed_dict)
 
         mastery_level = self.get_mastery_level()
  
