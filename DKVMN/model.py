@@ -24,13 +24,32 @@ class DKVMNModel(_model.Mixin):
 
         #tf.set_random_seed(224)
         self.logger = dkvmn_utils.set_logger('DKVMN', self.args.prefix + 'dkvmn.log', self.args.logging_level)
+        self.model_name = 'DKVMN'
 
 
         #self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
         
-        self.build_model()
-        self.build_total_prob_graph()
-        self.build_mastery_graph()
+        if self.args.dkvmn_train == True:
+            self.build_model()
+            self.build_total_prob_graph()
+            self.build_mastery_graph()
+        else:
+            #print(self.ckpt_dir)
+            #print(self.model_dir) 
+                
+            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
+            #print(checkpoint_dir)
+            ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+            if ckpt and ckpt.model_checkpoint_path:
+                ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+                #print(ckpt_name)
+                self.train_count = int(ckpt_name.split('-')[-1])
+
+                self.new_saver = tf.train.import_meta_graph(os.path.join(checkpoint_dir, ckpt_name+'.meta'))
+                self.logger.debug('DKVMN graph loaded')
+                self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+                self.logger.debug('DKVMN ckpt loaded')
+            
 
     def get_init_counter(self):
         return np.zeros([1,self.args.n_questions+1])  
@@ -78,12 +97,14 @@ class DKVMNModel(_model.Mixin):
 
         self.train_count = 0
         #if self.args.init_from:
+        '''
         if self.load():
             self.logger.debug('Checkpoint exists')
             #print('Checkpoint exists and skip training')
             #return 
         else:
             self.logger.debug('No checkpoint')
+        '''
         '''
         else:
             if os.path.exists(os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)):
@@ -210,11 +231,14 @@ class DKVMNModel(_model.Mixin):
 
         steps = test_q.shape[0] // self.args.batch_size
         self.sess.run(tf.global_variables_initializer())
+
+        ''' 
         if self.load(checkpoint_dir):
             self.logger.debug('CKPT Loaded')
         else:
             self.logger.debug('CKPT need')
             raise Exception()
+        ''' 
 
 
         pred_list = list()
@@ -281,10 +305,12 @@ class DKVMNModel(_model.Mixin):
 
 
     def clustering_actions(self):
+        '''
         if self.load():
             print('CKPT Loaded')
         else:
             raise Exception('CKPT need')
+        '''
 
         value_matrix = self.get_init_value_matrix()
         #value_matrix = self.sess.run(self.init_memory_value)
@@ -323,10 +349,12 @@ class DKVMNModel(_model.Mixin):
 
     def ideal_test_given_type(self, input_type): 
         
+        '''
         if self.load():
             print('CKPT Loaded')
         else:
             raise Exception('CKPT need')
+        '''
 
         log_file_name = 'logs/'+self.model_dir
         if input_type == 0:
@@ -398,6 +426,7 @@ class DKVMNModel(_model.Mixin):
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+            print(ckpt_name)
             self.train_count = int(ckpt_name.split('-')[-1])
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
             self.logger.debug('DKVMN ckpt loaded')
@@ -406,13 +435,24 @@ class DKVMNModel(_model.Mixin):
             self.logger.debug('DKVMN cktp not loaded')
             return False
 
-    def save(self, global_step, checkpoint_dir=''):
-        model_name = 'DKVMN'
+    '''
+    @property
+    def ckpt_dir(self, checkpoint_dir=''):
         if checkpoint_dir == '':
             checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
         if not os.path.exists(checkpoint_dir):
             os.mkdir(checkpoint_dir)
-        self.saver.save(self.sess, os.path.join(checkpoint_dir, model_name), global_step=global_step)
+
+        return checkpoint_dir
+    '''
+
+    def save(self, global_step, checkpoint_dir=''):
+        if checkpoint_dir == '':
+            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
+        if not os.path.exists(checkpoint_dir):
+            os.mkdir(checkpoint_dir)
+        self.saver.save(self.sess, os.path.join(checkpoint_dir, self.model_name), global_step=global_step)
+        #self.saver.save(self.sess, os.path.join(checkpoint_dir, self.model_name), global_step=global_step, write_meta_graph=False)
         self.logger.debug('Save checkpoint at %d' % (global_step+1))
 
     # Log file

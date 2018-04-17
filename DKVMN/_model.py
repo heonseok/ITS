@@ -413,7 +413,6 @@ class Mixin:
         counter_content_logit = operations.linear(tf.cast(stacked_mastery_counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
         counter_content = tf.sigmoid(counter_content_logit)
 
-        print('******************************** Mastery level prior difficulty')
         print(read_content.shape)
         print(zero_q_embed.shape)
         print(counter_content.shape)
