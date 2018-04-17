@@ -36,9 +36,11 @@ class DKVMNAnalyzer():
         self.test1(True)
         self.test2(True)
     
+        '''
         self.logger.info('value matrix update disable') 
         self.test1(False)
         self.test2(False)
+        '''
         
     def test1(self, update_value_matrix_flag):
         self.logger.info('Test 1')
@@ -65,17 +67,27 @@ class DKVMNAnalyzer():
         right_updated_skill_counter = 0
         wrong_updated_skill_list = []
 
-        for action_idx in range(self.num_actions):
-            _, _, _, wrong_response_count = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, update_value_matrix_flag)
+        right_updated_mastery_counter = 0
+        wrong_updated_mastery_list = []
 
-            if wrong_response_count == 0:
+        for action_idx in range(self.num_actions):
+            _, _, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, update_value_matrix_flag)
+
+            if wrong_response_count_prob == 0:
                 right_updated_skill_counter += 1
-            elif wrong_response_count > 0:
+            elif wrong_response_count_prob > 0:
                 wrong_updated_skill_list.append(action_idx+1)
 
+            if wrong_response_count_mastery == 0:
+                right_updated_mastery_counter += 1
+            elif wrong_response_count_mastery > 0:
+                wrong_updated_mastery_list.append(action_idx+1)
 
-        self.logger.info('{}, {}'.format(answer_type, right_updated_skill_counter))
+        self.logger.info('Probs   {}, {}'.format(answer_type, right_updated_skill_counter))
         self.logger.info('{}'.format(int2str_list(wrong_updated_skill_list)))
+
+        self.logger.info('Mastery {}, {}'.format(answer_type, right_updated_mastery_counter))
+        self.logger.info('{}'.format(int2str_list(wrong_updated_mastery_list)))
 
 
     # TODO : rename it
@@ -84,6 +96,7 @@ class DKVMNAnalyzer():
         answer = self.dkvmn.expand_dims(answer_type)
 
         prev_probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
+        prev_mastery_level = self.dkvmn.get_mastery_level(value_matrix, counter)
         action = self.dkvmn.expand_dims(action_idx+1)
 
         if update_value_matrix_flag == True:
@@ -91,15 +104,19 @@ class DKVMNAnalyzer():
         counter[0,action_idx + 1] += 1
 
         probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
+        mastery_level = self.dkvmn.get_mastery_level(value_matrix, counter)
 
         probs_diff = probs - prev_probs
+        mastery_diff = mastery_level - prev_mastery_level
     
         if answer_type == 1:
-            wrong_response_count = np.sum(probs_diff < 0)
+            wrong_response_count_prob = np.sum(probs_diff < 0)
+            wrong_response_count_mastery = np.sum(mastery_diff < 0)
         elif answer_type == 0:
-            wrong_response_count = np.sum(probs_diff > 0)
+            wrong_response_count_prob = np.sum(probs_diff > 0)
+            wrong_response_count_mastery = np.sum(mastery_diff > 0)
 
-        return value_matrix, counter, probs, wrong_response_count
+        return value_matrix, counter, probs, mastery_level, wrong_response_count_prob, wrong_response_count_mastery
 
     def test2_base(self, answer_type, update_value_matrix_flag):
         ''' 
@@ -123,7 +140,7 @@ class DKVMNAnalyzer():
             prob_mat[action_idx][0] = init_probs[action_idx]
             for repeat_idx in range(repeat_num):
 
-                value_matrix, counter, probs, _ = self.calc_influence(action_idx, answer_type, value_matrix, counter, update_value_matrix_flag)
+                value_matrix, counter, probs, mastery, _, _ = self.calc_influence(action_idx, answer_type, value_matrix, counter, update_value_matrix_flag)
                 prob_mat[action_idx][repeat_idx+1] = probs[action_idx]
 
         increase_count, decrease_count = calc_seq_trend(prob_mat)

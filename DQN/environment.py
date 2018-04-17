@@ -30,7 +30,7 @@ class DKVMNEnvironment():
             self.state = mastery_level 
 
         self.net_correct_arr = np.zeros(self.num_actions)
-        self.access_arr = np.zeros(self.num_actions)
+        #self.access_arr = np.zeros(self.num_actions)
 
         self.correct_counter = 0
         self.action_count = 0
@@ -43,28 +43,12 @@ class DKVMNEnvironment():
         return self.env.get_mastery_level(self.value_matrix, self.counter)
         #return np.squeeze(self.sess.run([self.env.concept_mastery_level], feed_dict={self.env.mastery_value_matrix: self.value_matrix}))
 
-    def env_status(self):
-        probs = self.get_prediction_probability()
-        prev_mastery_level = self.env.get_mastery_level() 
-
-        answer = np.expand_dims(np.expand_dims(1, axis=0), axis=0)
-
-        #self.logger.debug('Prob valdiff readdiff sumdiff probdiff masterydiff')
-        for action_index in range(self.num_actions):
-            action = np.asarray(action_index+1, dtype=np.int32)
-            action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
-
-            ops = [self.env.stepped_value_matrix, self.env.value_matrix_difference, self.env.read_content_difference, self.env.summary_difference, self.env.pred_prob_difference]
-            val_matrix, val_diff, read_diff, summary_diff, prob_diff = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})
-            mastery_level = self.get_mastery_level()
-            mastery_diff = np.sum(mastery_level[0]-prev_mastery_level[0])
-
-            #self.logger.debug('{: .4f} {: .4f} {: .4f} {: .4f} {: .4f} {: .4f}'.format(probs[action_index], val_diff, read_diff, summary_diff, prob_diff, mastery_diff)) 
             
 
     def new_episode(self):
         net_correct_count = np.sum(self.net_correct_arr)
-        access = np.sum(self.access_arr)
+        access = np.sum(self.counter > 0)
+        #access = np.sum(self.access_arr)
         
         net_correct_rate = net_correct_count / access 
 
@@ -86,7 +70,7 @@ class DKVMNEnvironment():
         self.value_matrix = self.env.get_init_value_matrix()
         self.counter = self.env.get_init_counter()
         self.net_correct_arr = np.zeros(self.num_actions)
-        self.access_arr = np.zeros(self.num_actions)
+        #self.access_arr = np.zeros(self.num_actions)
         self.correct_counter = 0
 
         starting_values_probs = self.get_prediction_probability()
@@ -123,36 +107,68 @@ class DKVMNEnvironment():
         
         return access, net_correct_count, net_correct_rate, pos_terminal_num, neg_terminal_num, non_terminal_num    
     
-    def get_mask(self):
+    def get_mask_over_th(self):
 
         if self.args.terminal_condition == 'prob':
             target = self.get_prediction_probability()
         elif self.args.terminal_condition == 'mastery':
             target = self.get_mastery_level() 
 
-        target_index = target >= self.args.terminal_threshold
-        return target_index 
-        #return target_index * self.net_correct_arr
+        target_index = (target >= self.args.terminal_threshold)
+        #return target_index 
+        return target_index * self.net_correct_arr
+
+
+    '''
+    def mask_under_th(self, values):
+        mask = self.get_mask_over_th()
+        return (1-mask) * values
+    '''
+
+
+    def baseline_action(self):
+        total_preds = self.get_prediction_probability()
+        total_preds = (1-self.get_mask_over_th()) * total_preds
+        #total_preds = self.mask_actions(total_preds)
+
+        if self.args.test_policy_type == 'prob_max':
+            action = np.argmax(total_preds)
+        '''
+        elif self.args.test_policy_type == 'prob_min':
+            action = np.argmin(total_preds)
+        '''
+        return action 
+
+
+    def random_action(self):
+        while True:
+            action = random.randrange(0, self.num_actions)
+            if self.get_mask_over_th()[action] == 0:
+                break
+        return action
+        #return random.randrange(0, self.num_actions)
+
+
 
     def check_terminal(self):
         condition_type = self.args.terminal_condition_type
 
-        if condition_type == 'pos_mastery':
-            return self.check_pos_mastery()
-        elif condition_type == 'posneg_mastery':
-            return self.check_posneg_mastery()
+        if condition_type == 'pos':
+            return self.check_pos()
+        elif condition_type == 'posneg':
+            return self.check_posneg()
         elif condition_type == 'when_to_stop':
             return self.check_when_to_stop()
             
 
-    def check_pos_mastery(self):
-        mask = self.get_mask()
+    def check_pos(self):
+        mask = self.get_mask_over_th()
         if np.prod(mask) == 1:
             return True
         else: 
             return False
 
-    def check_posneg_mastery(self):
+    def check_posneg(self):
         target = self.get_prediction_probability()
         target_index_under = target < self.args.terminal_threshold
         target_index_over = target > 1 - self.args.terminal_threshold 
@@ -215,33 +231,17 @@ class DKVMNEnvironment():
             return False
 
 
-
-    def mask_actions(self, values):
-        mask = self.get_mask()
-        return (1-mask) * values
-
-    def baseline_action(self):
-        total_preds = self.get_prediction_probability()
-        total_preds = self.mask_actions(total_preds)
-
-        if self.args.test_policy_type == 'prob_max':
-            action = np.argmax(total_preds)
-        elif self.args.test_policy_type == 'prob_min':
-            action = np.argmin(total_preds)
-        return action 
-
-
     def act(self, action_idx):
 
         self.action_count += 1
         
-        self.counter[0, action_idx+1] += 1
         #print('CCCCCCCCCCCCCCCCCCCCCCCC')
         #print(self.counter.shape)
         #print(self.counter)
         #action = np.asarray(action_idx+1, dtype=np.int32)
         #action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
         action = self.env.expand_dims(action_idx+1)
+        #print(action)
 
         # -1 for sampling 
         # 0, 1 for input given
@@ -266,7 +266,7 @@ class DKVMNEnvironment():
             a = qa 
             self.net_correct_arr[a-1] = 0 
 
-        self.access_arr[a-1] = 1
+        #self.access_arr[a-1] = 1
 
 
         if self.args.reward_type == 'value':
@@ -288,12 +288,13 @@ class DKVMNEnvironment():
 
 
         self.episode_step += 1
+        self.counter[0, action_idx+1] += 1
 
         #self.logger.debug('QA : %3d, Reward : %+5.4f, Prob : %1.4f, ProbDiff : %+1.4f' % (qa, self.reward, stepped_prob, prob_diff))
 
         if self.episode_step == self.args.episode_maxstep:
             terminal = True
-        elif self.check_when_to_stop() == True:
+        elif self.check_terminal() == True:
         #elif self.check_terminal() == True:
             terminal = True
         else:
@@ -301,10 +302,23 @@ class DKVMNEnvironment():
 
         return np.squeeze(self.state), self.reward, terminal, mastery_level, self.get_prediction_probability()
 
-    def random_action(self):
-        while True:
-            action = random.randrange(0, self.num_actions)
-            if self.get_mask()[action] == 0:
-                break
-        return action
-        #return random.randrange(0, self.num_actions)
+
+    '''
+    def env_status(self):
+        probs = self.get_prediction_probability()
+        prev_mastery_level = self.env.get_mastery_level() 
+
+        answer = np.expand_dims(np.expand_dims(1, axis=0), axis=0)
+
+        #self.logger.debug('Prob valdiff readdiff sumdiff probdiff masterydiff')
+        for action_index in range(self.num_actions):
+            action = np.asarray(action_index+1, dtype=np.int32)
+            action = np.expand_dims(np.expand_dims(action, axis=0), axis=0)
+
+            ops = [self.env.stepped_value_matrix, self.env.value_matrix_difference, self.env.read_content_difference, self.env.summary_difference, self.env.pred_prob_difference]
+            val_matrix, val_diff, read_diff, summary_diff, prob_diff = self.sess.run(ops, feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix})
+            mastery_level = self.get_mastery_level()
+            mastery_diff = np.sum(mastery_level[0]-prev_mastery_level[0])
+
+            #self.logger.debug('{: .4f} {: .4f} {: .4f} {: .4f} {: .4f} {: .4f}'.format(probs[action_index], val_diff, read_diff, summary_diff, prob_diff, mastery_diff)) 
+    '''

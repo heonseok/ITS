@@ -194,6 +194,7 @@ class DKVMNAgent():
 
         if self.args.test_policy_type == 'random' or np.random.rand() < self.eps:
             action = self.env.random_action()
+            #print('random action ' + str(action))
         elif self.args.test_policy_type == 'prob_max' or self.args.test_policy_type == 'prob_min':
             action = self.env.baseline_action()
         elif self.args.test_policy_type == 'dqn':
@@ -201,7 +202,8 @@ class DKVMNAgent():
             self.q = self.dqn.predict_Q_value(np.squeeze(self.env.state))[0]
 
             ## Msking problems for higher than 0.9
-            self.q = self.env.mask_actions(self.q)
+            #self.q = self.env.mask_actions(self.q)
+            self.q = (1-self.env.get_mask_over_th()) * self.q 
 
             action = np.argmax(self.q)
             

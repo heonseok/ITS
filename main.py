@@ -166,13 +166,14 @@ def main():
         parser.add_argument('--state_type', type=str, choices=['value', 'mastery'], default='mastery')
         parser.add_argument('--reward_type', type=str, choices=['value', 'read', 'summary', 'prob', 'mastery'], default='mastery')
         parser.add_argument('--test_policy_type', type=str, choices=['random', 'dqn', 'prob_max', 'prob_min'], default='dqn')
-        parser.add_argument('--terminal_condition_type', type=str, choices=['pos_mastery', 'posneg_mastery', 'when_to_stop'], default='posneg_mastery')
+
+        parser.add_argument('--terminal_condition', type=str, choices=['prob', 'mastery'], default='prob')
+        parser.add_argument('--terminal_condition_type', type=str, choices=['pos', 'posneg', 'when_to_stop'], default='posneg')
+        parser.add_argument('--terminal_threshold', type=float, default=0.9)
 
         parser.add_argument('--num_test_episode', type=int, default=100)
 
 
-        parser.add_argument('--terminal_condition', type=str, choices=['prob, mastery'], default='prob')
-        parser.add_argument('--terminal_threshold', type=float, default=0.9)
 
         parser.add_argument('--sampling_action_type', type=str, choices=['uniform', 'clipping'], default='uniform')
 

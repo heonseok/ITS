@@ -326,9 +326,9 @@ class Mixin:
         threshold = tf.random_uniform(pred_prob.shape)
 
         a = tf.cast(tf.less(threshold, pred_prob), tf.int32)
-        #qa = q + tf.multiply(a, self.args.n_questions)[0]
+        qa = q + tf.multiply(a, self.args.n_questions)[0]
 
-        return a 
+        return qa 
 
     def build_step_graph(self):
         # q : action for RL

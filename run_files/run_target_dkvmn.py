@@ -65,7 +65,10 @@ for repeat_idx in range(repeat_num):
 
                                                 args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f')
                                                 args_list.append('--dqn_train f --dqn_test f')
-                                                args_list.append('--terminal_condition_type posneg_mastery') 
+
+                                                args_list.append('--terminal_condition prob')
+                                                args_list.append('--terminal_condition_type pos') 
+                                                #args_list.append('--terminal_condition_type posneg_mastery') 
 
                                                 args_list.append('--using_counter_graph t')
                                                 args_list.append('--counter_embedding_dim')                    

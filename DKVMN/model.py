@@ -381,7 +381,7 @@ class DKVMNModel(_model.Mixin):
 
         repeat_detail = '_rIdx_{}'.format(self.args.repeat_idx)
     
-        if self.args.dataset == 'assist_2009_updated':
+        if self.args.dataset == 'assist2009_updated':
             dataset_detail = ''
         else:
             dataset_detail = '_{}'.format(self.args.dataset)
