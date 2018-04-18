@@ -12,8 +12,6 @@ class Mixin:
         #q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
         #q_embed_content = tf.tanh(q_embed_content_logit)
 
-        #print('CCCCCCCCDDDDDDDDDDDDDDDDDDDDDD')
-        #print(counter.shape)
         counter_content_logit = operations.linear(tf.cast(counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
         counter_content = tf.sigmoid(counter_content_logit)
 
@@ -333,13 +331,15 @@ class Mixin:
     def build_step_graph(self):
         # q : action for RL
         # value_matrix : state for RL
-        self.q = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_q') 
-        self.a = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_a') 
+        self.q = tf.placeholder(tf.int32, [1, 1], name='step_q') 
+        self.a = tf.placeholder(tf.int32, [1, 1], name='step_a') 
+        #self.q = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_q') 
+        #self.a = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='step_a') 
         self.value_matrix = tf.placeholder(tf.float32, [self.args.memory_size, self.args.memory_value_state_dim], name='step_value_matrix')
 
         # TODO : counter 
-        self.step_counter = tf.placeholder(tf.int32, [self.args.batch_size, self.args.n_questions+1], name='step_counter')
-        self.step_using_counter_graph = tf.placeholder(tf.bool)
+        self.counter = tf.placeholder(tf.int32, [self.args.batch_size, self.args.n_questions+1], name='step_counter')
+        #self.step_using_counter_graph = tf.placeholder(tf.bool)
         
 
         slice_a = tf.split(self.a, self.args.seq_len, 1) 
@@ -360,7 +360,7 @@ class Mixin:
 
         ######### Before Step ##########
         #prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix)
-        prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = tf.cond(self.step_using_counter_graph, lambda:self.inference_with_counter(q_embed, correlation_weight, stacked_value_matrix, self.step_counter), lambda:self.inference(q_embed, correlation_weight, stacked_value_matrix))
+        prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = tf.cond(self.using_counter_graph, lambda:self.inference_with_counter(q_embed, correlation_weight, stacked_value_matrix, self.counter), lambda:self.inference(q_embed, correlation_weight, stacked_value_matrix))
         prev_mastery_level = self.calculate_mastery_level(stacked_value_matrix)
 
         ######### STEP #####################
@@ -368,39 +368,50 @@ class Mixin:
         # TODO : refactor sampling_a_given_q to return a only for below function call
         self.stepped_value_matrix = tf.squeeze(self.memory.value.write_given_a(stacked_value_matrix, correlation_weight, knowledge_growth, a), axis=0)
         #self.stepped_read_content, self.stepped_summary, self.stepped_pred_logits, self.stepped_pred_prob = self.inference(q_embed, correlation_weight, self.stepped_value_matrix)
+
+        ##### Building other useful graphs
+        # TODO : remove using_counter graph because it is member variable of model
+        self.build_total_prob_graph(self.value_matrix, self.counter, self.using_counter_graph)
+        self.build_mastery_graph(self.value_matrix, self.counter, self.using_counter_graph)
+
+        '''
         self.stepped_read_content, self.stepped_summary, self.stepped_pred_logits, self.stepped_pred_prob = tf.cond(self.step_using_counter_graph, lambda:self.inference_with_counter(q_embed, correlation_weight, self.stepped_value_matrix, self.step_counter), lambda:self.inference(q_embed, correlation_weight, self.stepped_value_matrix))
 
+        '''
+
+        '''
         ######### After Step #########
         self.value_matrix_difference = tf.squeeze(tf.reduce_sum(self.stepped_value_matrix - stacked_value_matrix))
         self.read_content_difference = tf.squeeze(tf.reduce_sum(self.stepped_read_content - prev_read_content))
         self.summary_difference = tf.squeeze(tf.reduce_sum(self.stepped_summary - prev_summary))
         self.pred_logit_difference = tf.squeeze(tf.reduce_sum(self.stepped_pred_logits - prev_pred_logits))
         self.pred_prob_difference = tf.squeeze(tf.reduce_sum(self.stepped_pred_prob - prev_pred_prob))
+        '''
 
-    def build_total_prob_graph(self):
+    def build_total_prob_graph(self, value_matrix, counter, using_counter_graph):
         #self.total_q_data = tf.placeholder(tf.int32, [self.args.n_questions], name='total_q_data') 
-        self.total_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='total_value_matrix')
-        self.total_counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='total_counter')
-        self.total_using_counter_graph = tf.placeholder(tf.bool)
+        #self.total_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='total_value_matrix')
+        #self.total_counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='total_counter')
+        #self.total_using_counter_graph = tf.placeholder(tf.bool)
 
         total_q_data = tf.constant(np.arange(1,self.args.n_questions+1))
         q_embeds = self.embedding_q(total_q_data)
         self.total_correlation_weight = self.memory.attention(q_embeds)
        
-        stacked_total_value_matrix = tf.tile(tf.expand_dims(self.total_value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
-        stacked_total_counter = tf.tile(self.total_counter, tf.stack([self.args.n_questions, 1]))
+        stacked_total_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
+        stacked_total_counter = tf.tile(counter, tf.stack([self.args.n_questions, 1]))
         #_, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix)
-        _, _, _, self.total_pred_probs = tf.cond(self.total_using_counter_graph, lambda:self.inference_with_counter(q_embeds, self.total_correlation_weight, stacked_total_value_matrix, stacked_total_counter), lambda:self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix))
+        _, _, _, self.total_pred_probs = tf.cond(using_counter_graph, lambda:self.inference_with_counter(q_embeds, self.total_correlation_weight, stacked_total_value_matrix, stacked_total_counter), lambda:self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix))
 
-    def build_mastery_graph(self):
-        self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
-        self.mastery_counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='mastery_counter')
-        self.mastery_using_counter_graph = tf.placeholder(tf.bool)
+    def build_mastery_graph(self, value_matrix, counter, using_counter_graph):
+        #self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
+        #self.mastery_counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='mastery_counter')
+        #self.mastery_using_counter_graph = tf.placeholder(tf.bool)
         #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
 
         one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
-        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(self.mastery_value_matrix, 0), tf.stack([self.args.memory_size, 1, 1]))
-        stacked_mastery_counter = tf.tile(self.mastery_counter, tf.stack([self.args.memory_size, 1]))
+        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.memory_size, 1, 1]))
+        stacked_mastery_counter = tf.tile(counter, tf.stack([self.args.memory_size, 1]))
 
         read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
         zero_q_embed = tf.zeros(shape=[self.args.memory_size, self.args.memory_key_state_dim]) 
@@ -416,7 +427,7 @@ class Mixin:
         print(read_content.shape)
         print(zero_q_embed.shape)
         print(counter_content.shape)
-        mastery_level_prior_difficulty = tf.cond(self.mastery_using_counter_graph, lambda: tf.concat([read_content, zero_q_embed, counter_content], 1), lambda: tf.concat([read_content, zero_q_embed], 1))
+        mastery_level_prior_difficulty = tf.cond(using_counter_graph, lambda: tf.concat([read_content, zero_q_embed, counter_content], 1), lambda: tf.concat([read_content, zero_q_embed], 1))
 
         #mastery_level_prior_difficulty = tf.concat([read_content, zero_q_embed], 1)
         #print('Mastery level prior difficulty')

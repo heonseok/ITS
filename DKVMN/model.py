@@ -13,9 +13,9 @@ from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
-import _model
+import _model_merged
 
-class DKVMNModel(_model.Mixin):
+class DKVMNModel(_model_merged.Mixin):
     def __init__(self, args, sess, name='KT'):
 
         self.args = args
@@ -27,13 +27,37 @@ class DKVMNModel(_model.Mixin):
         self.model_name = 'DKVMN'
 
 
+        self.using_counter_graph = tf.placeholder(tf.bool)
+
         #self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
         
         if self.args.dkvmn_train == True:
             self.build_model()
-            self.build_total_prob_graph()
-            self.build_mastery_graph()
+            #self.build_total_prob_graph()
+            #self.build_mastery_graph()
+        elif self.args.dkvmn_test == True:
+            print('CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC')
+            self.build_model()
+            #self.sess.run(tf.global_variables_initializer())
+
+            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
+            print(checkpoint_dir)
+            ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+            if ckpt and ckpt.model_checkpoint_path:
+                ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+                print(ckpt_name)
+                self.train_count = int(ckpt_name.split('-')[-1])
+
+                #self.new_saver = tf.train.import_meta_graph(os.path.join(checkpoint_dir, ckpt_name+'.meta'))
+                #self.logger.debug('DKVMN graph loaded')
+                self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+                #self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+                self.logger.debug('DKVMN ckpt loaded')
         else:
+            self.build_model()
+            self.args.batch_size = 1
+            self.args.seq_len = 1
+            self.build_step_graph()
             #print(self.ckpt_dir)
             #print(self.model_dir) 
                 
@@ -45,9 +69,10 @@ class DKVMNModel(_model.Mixin):
                 #print(ckpt_name)
                 self.train_count = int(ckpt_name.split('-')[-1])
 
-                self.new_saver = tf.train.import_meta_graph(os.path.join(checkpoint_dir, ckpt_name+'.meta'))
-                self.logger.debug('DKVMN graph loaded')
-                self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+                #self.new_saver = tf.train.import_meta_graph(os.path.join(checkpoint_dir, ckpt_name+'.meta'))
+                #self.logger.debug('DKVMN graph loaded')
+                self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+                #self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
                 self.logger.debug('DKVMN ckpt loaded')
             
 
@@ -58,14 +83,16 @@ class DKVMNModel(_model.Mixin):
         return self.sess.run(self.init_memory_value)
 
     def get_prediction_probability(self, value_matrix, counter):
-        return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.total_value_matrix: value_matrix, self.total_counter: counter, self.total_using_counter_graph: self.args.using_counter_graph}))
+        return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.value_matrix: value_matrix, self.counter: counter, self.using_counter_graph: self.args.using_counter_graph}))
+        #return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.total_value_matrix: value_matrix, self.total_counter: counter, self.total_using_counter_graph: self.args.using_counter_graph}))
 
     def get_mastery_level(self, value_matrix, counter):
-        return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict={self.mastery_value_matrix: value_matrix, self.mastery_counter: counter, self.mastery_using_counter_graph: self.args.using_counter_graph}))
+        return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict={self.value_matrix: value_matrix, self.counter: counter, self.using_counter_graph: self.args.using_counter_graph}))
+        #return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict={self.mastery_value_matrix: value_matrix, self.mastery_counter: counter, self.mastery_using_counter_graph: self.args.using_counter_graph}))
     
     def update_value_matrix(self, value_matrix, action, answer, counter):
        ops = [self.stepped_value_matrix]
-       value_matrix = self.sess.run(ops, feed_dict={self.q: action, self.a: answer, self.value_matrix: value_matrix, self.step_counter: counter, self.step_using_counter_graph: self.args.using_counter_graph})
+       value_matrix = self.sess.run(ops, feed_dict={self.q: action, self.a: answer, self.value_matrix: value_matrix, self.counter: counter, self.using_counter_graph: self.args.using_counter_graph})
        return np.squeeze(value_matrix)
 
     def expand_dims(self, val):
@@ -230,15 +257,15 @@ class DKVMNModel(_model.Mixin):
         self.logger.info('Test')
 
         steps = test_q.shape[0] // self.args.batch_size
-        self.sess.run(tf.global_variables_initializer())
+        #self.sess.run(tf.global_variables_initializer())
 
-        ''' 
+        '''
         if self.load(checkpoint_dir):
             self.logger.debug('CKPT Loaded')
         else:
             self.logger.debug('CKPT need')
             raise Exception()
-        ''' 
+        '''
 
 
         pred_list = list()

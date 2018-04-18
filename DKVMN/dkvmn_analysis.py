@@ -73,6 +73,8 @@ class DKVMNAnalyzer():
         for action_idx in range(self.num_actions):
             _, _, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, update_value_matrix_flag)
 
+            print(init_counter)
+
             if wrong_response_count_prob == 0:
                 right_updated_skill_counter += 1
             elif wrong_response_count_prob > 0:
@@ -91,7 +93,10 @@ class DKVMNAnalyzer():
 
 
     # TODO : rename it
-    def calc_influence(self, action_idx, answer_type, value_matrix, counter, update_value_matrix_flag):
+    def calc_influence(self, action_idx, answer_type, _value_matrix, _counter, update_value_matrix_flag):
+
+        value_matrix = np.copy(_value_matrix)
+        counter = np.copy(_counter)
  
         answer = self.dkvmn.expand_dims(answer_type)
 
