@@ -167,6 +167,7 @@ class Mixin:
 
     def build_model(self):
         # 'seq_len' means question sequences
+        #### TODO : Naming... terrible case. it should be fixed after paper published
         self.q_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='q_data_seq') 
         self.qa_data_seq = tf.placeholder(tf.int32, [self.args.batch_size, self.args.seq_len], name='qa_data')
         self.target_seq = tf.placeholder(tf.float32, [self.args.batch_size, self.args.seq_len], name='target')

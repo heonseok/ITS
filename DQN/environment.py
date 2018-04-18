@@ -253,6 +253,7 @@ class DKVMNEnvironment():
         prev_mastery_level = self.get_mastery_level()
 
         ## update value matrix 
+        ## TODO : diff variables are not implemented 
         ops = [self.env.stepped_value_matrix, self.env.value_matrix_difference, self.env.read_content_difference, self.env.summary_difference, self.env.qa, self.env.stepped_pred_prob, self.env.pred_prob_difference]
         feed_dict={self.env.q: action, self.env.a: answer, self.env.value_matrix: self.value_matrix, self.env.step_counter: self.counter, self.env.step_using_counter_graph: self.args.using_counter_graph}
         self.value_matrix, val_diff, read_diff, summary_diff, qa, stepped_prob, prob_diff = self.sess.run(ops, feed_dict=feed_dict)
