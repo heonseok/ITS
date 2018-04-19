@@ -18,6 +18,8 @@ class DKVMNAnalyzer():
     def __init__(self, args, sess, dkvmn):
         
         self.args = args
+        #self.args.batch_size = 1
+        #self.args.seq_len = 1
         self.sess = sess
         self.dkvmn = dkvmn
         self.dkvmn.build_step_graph()
@@ -26,11 +28,43 @@ class DKVMNAnalyzer():
         self.logger = set_logger('aDKVMN', self.args.prefix + 'dkvmn_analysis.log', self.args.logging_level)
         self.logger.debug('Initializing DKVMN Analyzer')
 
+
+    def calc_influence(self, action_idx, answer_type, _value_matrix, _counter, update_value_matrix_flag):
+
+        value_matrix = np.copy(_value_matrix)
+        counter = np.copy(_counter)
+ 
+        answer = self.dkvmn.expand_dims(answer_type)
+
+        prev_probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
+        prev_mastery_level = self.dkvmn.get_mastery_level(value_matrix, counter)
+        action = self.dkvmn.expand_dims(action_idx+1)
+
+        if update_value_matrix_flag == True:
+            value_matrix = self.dkvmn.update_value_matrix(value_matrix, action, answer, counter)
+        counter[0,action_idx + 1] += 1
+
+        probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
+        mastery_level = self.dkvmn.get_mastery_level(value_matrix, counter)
+
+        probs_diff = probs - prev_probs
+        mastery_diff = mastery_level - prev_mastery_level
+    
+        if answer_type == 1:
+            wrong_response_count_prob = np.sum(probs_diff < 0)
+            wrong_response_count_mastery = np.sum(mastery_diff < 0)
+        elif answer_type == 0:
+            wrong_response_count_prob = np.sum(probs_diff > 0)
+            wrong_response_count_mastery = np.sum(mastery_diff > 0)
+
+        return value_matrix, counter, probs, mastery_level, wrong_response_count_prob, wrong_response_count_mastery
+
+
     def test(self):
         self.logger.info('#'*120)
         self.logger.info(self.dkvmn.model_dir)
 
-        self.dkvmn.load()
+        #self.dkvmn.load()
         
         self.logger.info('value matrix update enable') 
         self.test1(True)
@@ -62,7 +96,6 @@ class DKVMNAnalyzer():
 
         init_value_matrix = self.dkvmn.get_init_value_matrix()
         init_counter = self.dkvmn.get_init_counter()
-        #init_probs = self.dkvmn.get_prediction_probability(init_value_matrix, init_counter)
         
         right_updated_skill_counter = 0
         wrong_updated_skill_list = []
@@ -72,8 +105,6 @@ class DKVMNAnalyzer():
 
         for action_idx in range(self.num_actions):
             _, _, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, update_value_matrix_flag)
-
-            print(init_counter)
 
             if wrong_response_count_prob == 0:
                 right_updated_skill_counter += 1
@@ -93,35 +124,6 @@ class DKVMNAnalyzer():
 
 
     # TODO : rename it
-    def calc_influence(self, action_idx, answer_type, _value_matrix, _counter, update_value_matrix_flag):
-
-        value_matrix = np.copy(_value_matrix)
-        counter = np.copy(_counter)
- 
-        answer = self.dkvmn.expand_dims(answer_type)
-
-        prev_probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
-        prev_mastery_level = self.dkvmn.get_mastery_level(value_matrix, counter)
-        action = self.dkvmn.expand_dims(action_idx+1)
-
-        if update_value_matrix_flag == True:
-            value_matrix = self.dkvmn.update_value_matrix(value_matrix, action, answer, counter)
-        counter[0,action_idx + 1] += 1
-
-        probs = self.dkvmn.get_prediction_probability(value_matrix, counter)
-        mastery_level = self.dkvmn.get_mastery_level(value_matrix, counter)
-
-        probs_diff = probs - prev_probs
-        mastery_diff = mastery_level - prev_mastery_level
-    
-        if answer_type == 1:
-            wrong_response_count_prob = np.sum(probs_diff < 0)
-            wrong_response_count_mastery = np.sum(mastery_diff < 0)
-        elif answer_type == 0:
-            wrong_response_count_prob = np.sum(probs_diff > 0)
-            wrong_response_count_mastery = np.sum(mastery_diff > 0)
-
-        return value_matrix, counter, probs, mastery_level, wrong_response_count_prob, wrong_response_count_mastery
 
     def test2_base(self, answer_type, update_value_matrix_flag):
         ''' 
@@ -133,7 +135,6 @@ class DKVMNAnalyzer():
         init_value_matrix = self.dkvmn.get_init_value_matrix()
 
         init_probs = self.dkvmn.get_prediction_probability(init_value_matrix, init_counter)
-        #answer = self.dkvmn.expand_dims(answer_type)
    
         prob_mat = np.zeros((self.num_actions, repeat_num+1))
 

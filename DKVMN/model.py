@@ -26,66 +26,19 @@ class DKVMNModel(_model_merged.Mixin):
         self.logger = dkvmn_utils.set_logger('DKVMN', self.args.prefix + 'dkvmn.log', self.args.logging_level)
         self.model_name = 'DKVMN'
 
-
         self.using_counter_graph = tf.placeholder(tf.bool)
-
-        #self.condition = tf.placeholder(tf.int32, [self.args.n_questions], name='condition') 
-        
         self.build_model()
-        #if self.args.dkvmn_train == True or self.args.dkmvn_test == True:
-            #self.build_total_prob_graph()
-            #self.build_mastery_graph()
+
         if self.args.dkvmn_test == True:
             self.load()
 
-            #self.build_model()
-            #self.sess.run(tf.global_variables_initializer())
-
-            #self.writer = tf.summary.FileWriter('tb_test')
-            #self.writer.add_graph(sess.graph)
-            #[n.name for n in tf.get_defulat_graph().as_graph_def().node]
-            #for op in tf.get_default_graph().get_operations():
-                #print(str(op.name))
-            '''
-            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
-            #print(checkpoint_dir)
-            ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-            if ckpt and ckpt.model_checkpoint_path:
-                ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-                #print(ckpt_name)
-                self.train_count = int(ckpt_name.split('-')[-1])
-
-                #self.new_saver = tf.train.import_meta_graph(os.path.join(checkpoint_dir, ckpt_name+'.meta'))
-                #self.logger.debug('DKVMN graph loaded')
-                self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-                #self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-                self.logger.debug('DKVMN ckpt loaded')
-            '''
-        elif self.args.dkvmn_analysis == True:
-            #self.build_model()
+        elif self.args.dkvmn_train == False and self.args.dkvmn_test == False:
             self.load()
+            #self.logger.debug('Non training & testing')
+            print('Non training & testing')
             self.args.batch_size = 1
             self.args.seq_len = 1
             self.build_step_graph()
-            #print(self.ckpt_dir)
-            #print(self.model_dir) 
-                
-            '''
-            checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
-            #print(checkpoint_dir)
-            ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-            if ckpt and ckpt.model_checkpoint_path:
-                ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-                #print(ckpt_name)
-                self.train_count = int(ckpt_name.split('-')[-1])
-
-                #self.new_saver = tf.train.import_meta_graph(os.path.join(checkpoint_dir, ckpt_name+'.meta'))
-                #self.logger.debug('DKVMN graph loaded')
-                self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-                #self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-                self.logger.debug('DKVMN ckpt loaded')
-            
-            '''
 
     def get_init_counter(self):
         return np.zeros([1,self.args.n_questions+1])  
@@ -445,10 +398,13 @@ class DKVMNModel(_model_merged.Mixin):
         
         # TODO refactoring if/else statement
 
+        '''
         if self.args.counter_embedding_dim == 20:
-            counter_dtail = ''
+            counter_detail = ''
         else:
             counter_detail = 'cDim_{}'.format(self.args.counter_embedding_dim)
+        '''
+        counter_detail = 'cDim_{}'.format(self.args.counter_embedding_dim)
 
         batch = '_batch_{}'.format(self.args.batch_size) 
 

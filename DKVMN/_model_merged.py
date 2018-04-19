@@ -104,11 +104,9 @@ class Mixin:
         #self.concept_mastery_level = tf.sigmoid(pred_logits)
 
     def build_memory(self):
-        with tf.variable_scope('Memory'):
-            init_memory_key = tf.get_variable('key', [self.args.memory_size, self.args.memory_key_state_dim], \
-                initializer=tf.random_normal_initializer(stddev=0.1))
-            self.init_memory_value = tf.get_variable('value', [self.args.memory_size,self.args.memory_value_state_dim], \
-                initializer=tf.random_normal_initializer(stddev=0.1))
+        with tf.variable_scope('Memory', reuse=tf.AUTO_REUSE):
+            init_memory_key = tf.get_variable('key', [self.args.memory_size, self.args.memory_key_state_dim], initializer=tf.random_normal_initializer(stddev=0.1))
+            self.init_memory_value = tf.get_variable('value', [self.args.memory_size,self.args.memory_value_state_dim], initializer=tf.random_normal_initializer(stddev=0.1))
                 
         # Broadcast memory value tensor to match [batch size, memory size, memory state dim]
         # First expand dim at axis 0 so that makes 'batch size' axis and tile it along 'batch size' axis
@@ -121,7 +119,7 @@ class Mixin:
 
     def build_embedding_mtx(self):
         # Embedding to [batch size, seq_len, memory_state_dim(d_k or d_v)]
-        with tf.variable_scope('Embedding'):
+        with tf.variable_scope('Embedding', reuse=tf.AUTO_REUSE):
             # A
             self.q_embed_mtx = tf.get_variable('q_embed', [self.args.n_questions+1, self.args.memory_key_state_dim],\
                 initializer=tf.random_normal_initializer(stddev=0.1))
@@ -339,19 +337,25 @@ class Mixin:
         self.value_matrix = tf.placeholder(tf.float32, [self.args.memory_size, self.args.memory_value_state_dim], name='step_value_matrix')
 
         # TODO : counter 
-        self.counter = tf.placeholder(tf.int32, [self.args.batch_size, self.args.n_questions+1], name='step_counter')
+        self.counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='step_counter')
+        #self.counter = tf.placeholder(tf.int32, [self.args.batch_size, self.args.n_questions+1], name='step_counter')
         #self.step_using_counter_graph = tf.placeholder(tf.bool)
         
 
-        slice_a = tf.split(self.a, self.args.seq_len, 1) 
-        a = tf.squeeze(slice_a[0], 1)
+        #slice_a = tf.split(self.a, self.args.seq_len, 1) 
+        #a = tf.squeeze(slice_a[0], 1)
+        a = tf.squeeze(self.a, 1)
+        #a = self.a
  
-        slice_q = tf.split(self.q, self.args.seq_len, 1) 
-        q = tf.squeeze(slice_q[0], 1)
+        #slice_q = tf.split(self.q, self.args.seq_len, 1) 
+        #q = tf.squeeze(self.q)
+        q = tf.squeeze(self.q, 1)
+        #q = self.q
         q_embed = self.embedding_q(q)
         correlation_weight = self.memory.attention(q_embed)
 
-        stacked_value_matrix = tf.tile(tf.expand_dims(self.value_matrix, 0), tf.stack([self.args.batch_size, 1, 1]))
+        stacked_value_matrix = tf.tile(tf.expand_dims(self.value_matrix, 0), tf.stack([1, 1, 1]))
+        #stacked_value_matrix = tf.tile(tf.expand_dims(self.value_matrix, 0), tf.stack([self.args.batch_size, 1, 1]))
          
         # -1 for sampling
         # 0, 1 for given answer

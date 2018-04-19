@@ -71,7 +71,7 @@ def setup():
     parser.add_argument('--write_type', type=str, choices=['add_off_erase_off', 'add_off_erase_on', 'add_on_erase_off', 'add_on_erase_on'], default='add_on_erase_on')
 
     parser.add_argument('--using_counter_graph', type=str2bool, default='t')
-    parser.add_argument('--counter_embedding_dim', type=int, default=20)
+    parser.add_argument('--counter_embedding_dim', type=int, default=64)
     #parser.add_argument('--using_counter_loss', type=str2bool, default='f')
     parser.add_argument('--counter_loss_weight', type=float, default=0.0)
 

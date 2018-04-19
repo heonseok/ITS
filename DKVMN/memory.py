@@ -7,7 +7,7 @@ import operations
 # This class defines Memory architecture in DKVMN
 class DKVMN_Memory():
     def __init__(self, memory_size, memory_state_dim, args, name):
-        tf.set_random_seed(224)
+        #tf.set_random_seed(224)
         self.name = name
         #print('%s initialized' % self.name)
         # Memory size : N
