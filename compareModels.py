@@ -19,8 +19,9 @@ from setup import *
 
 target_model_list = [ 
                       # k_growth   summary    cLossW  cGraph
-                      [ 'origin' , 'sigmoid', 0.0   , False ],
+                      #[ 'origin' , 'sigmoid', 0.0   , False ],
                       [ 'summary', 'sigmoid', 0.0002, True  ],
+                      [ 'summary', 'sigmoid', 0.0   , False ],
                     ]
 
 args, run_config = setup()
@@ -32,23 +33,33 @@ print(args)
 
 
 print(target_model_list)
+default_batch_size = args.batch_size
+default_seq_len = args.seq_len
+
 
 for model_idx, target_spec in enumerate(target_model_list):
     print(target_spec)
     tf.reset_default_graph()
+    # TODO : importing to DKVMN model as reset_argument?
 
     args.knowledge_growth = target_spec[0]
     args.summary_activation = target_spec[1]
     args.counter_loss_weight = target_spec[2]
     args.using_counter_graph = target_spec[3]
 
-    args.seq_len = 200
-    args.batch_size = 32
-    with tf.Session(config=run_config) as sess:
+    if args.repeat_idx == 0:
+        args.batch_size = default_batch_size 
+        args.seq_len = default_seq_len 
+        print(args.batch_size)
+        print(args.seq_len)
+        dkvmn = DKVMNModel(args, name='DKVMN')
+        graph = dkvmn.build_step_dkvmn_graph()
 
-        if args.repeat_idx == 0:
-            args.seq_len = 200
-            args.batch_size = 32
-            dkvmn = DKVMNModel(args, sess, name='DKVMN')
-            #aDKVMN = DKVMNAnalyzer(args, sess, dkvmn)
-            pass
+        with tf.Session(config = run_config, graph = graph) as sess:
+            tf.global_variables_initializer().run()
+            dkvmn.set_session(sess)
+            dkvmn.load()
+
+            aDKVMN = DKVMNAnalyzer(args, dkvmn)
+
+            aDKVMN.test()

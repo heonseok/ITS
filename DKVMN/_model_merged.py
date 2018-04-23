@@ -60,12 +60,14 @@ class Mixin:
 
         return read_content, summary_vector, pred_logits, pred_prob
 
+    # TODO : It should input value matrix 
     def calculate_mastery_level(self, value_matrix):
         #self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
         #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
 
         one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
         stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
+        #stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
         stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 1), tf.stack([1, self.args.memory_size, 1, 1]))
 
         # read_content : batch_size memory_size memory_state_dim 
@@ -102,6 +104,22 @@ class Mixin:
 
         return tf.sigmoid(pred_logits_reshaped)
         #self.concept_mastery_level = tf.sigmoid(pred_logits)
+
+    def calculate_pred_probs(self, value_matrix, counter):
+        total_q_data = tf.constant(np.arange(1, self.args.n_questions+1))
+        stacked_total_q_data = tf.tile(tf.expand_dims(total_q_data, 0), tf.stack([self.args.batch_size, 1, 1]))
+        q_embeds = self.embedding_q(stacked_total_q_data)
+        total_correlation_weight = self.memory.attention(q_embeds)
+        stacked_total_correlation_weight = tf.tile(tf.expand_dims(total_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
+        
+       
+        stacked_total_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
+        stacked_total_counter = tf.tile(counter, tf.stack([self.args.n_questions, 1]))
+        #_, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix)
+        _, _, _, total_pred_probs = tf.cond(using_counter_graph, lambda:self.inference_with_counter(q_embeds, total_correlation_weight, stacked_total_value_matrix, stacked_total_counter), lambda:self.inference(q_embeds, total_correlation_weight, stacked_total_value_matrix))
+
+        return total_pred_probs
+        
 
     def build_memory(self):
         with tf.variable_scope('Memory', reuse=tf.AUTO_REUSE):
@@ -172,8 +190,6 @@ class Mixin:
 
         self.selected_mastery_index = tf.placeholder(tf.int32, name='selected_mastery_index')
 
-        #self.using_counter_graph = tf.placeholder(tf.bool)
-
         self.memory = self.build_memory()
         self.build_embedding_mtx()
             
@@ -184,9 +200,6 @@ class Mixin:
         
         prediction = list()
         mastery_level_list = list()
-
-        #counter = tf.zeros([self.args.batch_size, self.args.memory_key_state_dim])
-        #counter = tf.zeros([self.args.batch_size, self.args.n_questions])
 
         #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value, False)
         #mastery_level_list.append(mastery_level)
@@ -217,7 +230,13 @@ class Mixin:
 
             correlation_weight = self.memory.attention(q_embed)
 
-            mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value)
+            # TODO : There was a bug 
+            # mastery level 
+            mastery_level = self.calculate_mastery_level(self.memory.memory_value)
+            #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value)
+
+            #prev_total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter)
+            #print(total_pred_probs.shape)
                 
             prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = tf.cond(self.using_counter_graph, lambda:self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, self.q_counter), lambda:self.inference(q_embed, correlation_weight, self.memory.memory_value))
             #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
@@ -226,7 +245,9 @@ class Mixin:
 
             knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, correlation_weight, qa_embed, prev_read_content, prev_summary, prev_pred_prob, mastery_level)
             self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
+
             mastery_level = self.calculate_mastery_level(self.memory.memory_value)
+            #total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter)
             mastery_level_list.append(mastery_level)
 
 
@@ -394,10 +415,6 @@ class Mixin:
         '''
 
     def build_total_prob_graph(self, value_matrix, counter, using_counter_graph):
-        #self.total_q_data = tf.placeholder(tf.int32, [self.args.n_questions], name='total_q_data') 
-        #self.total_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='total_value_matrix')
-        #self.total_counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='total_counter')
-        #self.total_using_counter_graph = tf.placeholder(tf.bool)
 
         total_q_data = tf.constant(np.arange(1,self.args.n_questions+1))
         q_embeds = self.embedding_q(total_q_data)
@@ -409,10 +426,6 @@ class Mixin:
         _, _, _, self.total_pred_probs = tf.cond(using_counter_graph, lambda:self.inference_with_counter(q_embeds, self.total_correlation_weight, stacked_total_value_matrix, stacked_total_counter), lambda:self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix))
 
     def build_mastery_graph(self, value_matrix, counter, using_counter_graph):
-        #self.mastery_value_matrix = tf.placeholder(tf.float32, [self.args.memory_size,self.args.memory_value_state_dim], name='mastery_value_matrix')
-        #self.mastery_counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='mastery_counter')
-        #self.mastery_using_counter_graph = tf.placeholder(tf.bool)
-        #self.target_concept_index = tf.placeholder(tf.int32, name='target_concept_index')
 
         one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
         stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.memory_size, 1, 1]))

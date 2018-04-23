@@ -40,7 +40,7 @@ def setup():
     ########## DKVMN ##########
     parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
     parser.add_argument('--num_epochs', type=int, default=100)
-    parser.add_argument('--init_from', type=str2bool, default='t')
+    parser.add_argument('--init_from', type=str2bool, default='f')
     parser.add_argument('--show', type=str2bool, default='f')
     parser.add_argument('--early_stop', type=str2bool, default='f')
     parser.add_argument('--early_stop_th', type=int, default=20)
@@ -74,6 +74,7 @@ def setup():
     parser.add_argument('--counter_embedding_dim', type=int, default=64)
     #parser.add_argument('--using_counter_loss', type=str2bool, default='f')
     parser.add_argument('--counter_loss_weight', type=float, default=0.0)
+    parser.add_argument('--decrease_loss_weight', type=float, default=0.0)
 
     #parser.add_argument('--using_weighted_update', type=str2bool, default='f')
     #parser.add_argument('--weighted_update_type', type=str, choices=['prob_diff, softmax'], default='prob_diff')

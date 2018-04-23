@@ -15,14 +15,17 @@ from model import *
 import pickle
 
 class DKVMNAnalyzer():
-    def __init__(self, args, sess, dkvmn):
+    def __init__(self, args, dkvmn):
+    #def __init__(self, args, sess, dkvmn):
         
         self.args = args
+        #self.args = Namespace(**vars(args))
+        #self.args = np.copy(args)
         #self.args.batch_size = 1
         #self.args.seq_len = 1
-        self.sess = sess
+        #self.sess = sess
         self.dkvmn = dkvmn
-        self.dkvmn.build_step_graph()
+        #self.dkvmn.build_step_graph()
         self.num_actions = self.args.n_questions
 
         self.logger = set_logger('aDKVMN', self.args.prefix + 'dkvmn_analysis.log', self.args.logging_level)

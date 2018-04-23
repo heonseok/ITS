@@ -248,7 +248,31 @@ def main():
         test_q_data = test_data['q']
         test_qa_data = test_data['qa']
 
+    dkvmn = DKVMNModel(myArgs, name='DKVMN')
 
+    if myArgs.dkvmn_train or myArgs.dkvmn_test:
+        graph = dkvmn.build_dkvmn_graph()
+        with tf.Session(config = run_config, graph = graph) as sess:
+            dkvmn.set_session(sess)
+
+            if myArgs.dkvmn_train:
+                dkvmn.train(train_q_data, train_qa_data, valid_q_data, valid_qa_data, myArgs.early_stop)
+
+            if myArgs.dkvmn_test:
+                dkvmn.load()
+                dkvmn.test(test_q_data, test_qa_data)
+
+    if myArgs.dkvmn_analysis:
+        graph = dkvmn.build_step_dkvmn_graph()
+        with tf.Session(config = run_config, graph = graph) as sess:
+            dkvmn.set_session(sess)
+
+            dkvmn.load()
+            aDKVMN = DKVMNAnalyzer(myArgs, dkvmn)
+            aDKVMN.test()
+    '''
+
+    # TODO : remove sess from __init__
     with tf.Session(config=run_config) as sess:
         dkvmn = DKVMNModel(myArgs, sess, name='DKVMN')
 
@@ -271,26 +295,25 @@ def main():
             cDKVMN.test(test_q_data, test_qa_data)
 
         if myArgs.dkvmn_analysis:
-            myArgs.batch_size = 1
-            myArgs.seq_len = 1
+            #myArgs.batch_size = 1
+            #myArgs.seq_len = 1
             aDKVMN = DKVMNAnalyzer(myArgs, sess, dkvmn)
-
             aDKVMN.test()
 
         if myArgs.dkvmn_ideal_test:
-            myArgs.batch_size = 1
-            myArgs.seq_len = 1
-            dkvmn.build_step_graph()
+            #myArgs.batch_size = 1
+            #myArgs.seq_len = 1
+            #dkvmn.build_step_graph()
             dkvmn.ideal_test()
         
         ##### DQN #####
         if myArgs.dqn_train or myArgs.dqn_test:
             sess.run(tf.global_variables_initializer()) 
       
-            myArgs.batch_size = 1
-            myArgs.seq_len = 1
+            #myArgs.batch_size = 1
+            #myArgs.seq_len = 1
             myAgent = DKVMNAgent(myArgs, sess, dkvmn)
-            dkvmn.build_step_graph()
+            #dkvmn.build_step_graph()
 
         if myArgs.dqn_train:
             if os.path.exists('./train.csv'):
@@ -299,6 +322,7 @@ def main():
 
         if myArgs.dqn_test:
             myAgent.play()
+    '''
 
 #except KeyboardInterrupt:
     #print('Program END')

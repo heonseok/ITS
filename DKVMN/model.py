@@ -16,29 +16,67 @@ from sklearn.cluster import KMeans
 import _model_merged
 
 class DKVMNModel(_model_merged.Mixin):
-    def __init__(self, args, sess, name='KT'):
+    def __init__(self, args, name='KT'):
+    #def __init__(self, args, sess, name='KT'):
 
         self.args = args
         self.name = name
-        self.sess = sess
+        #self.sess = sess
 
         #tf.set_random_seed(224)
         self.logger = dkvmn_utils.set_logger('DKVMN', self.args.prefix + 'dkvmn.log', self.args.logging_level)
         self.model_name = 'DKVMN'
 
-        self.using_counter_graph = tf.placeholder(tf.bool)
+        #tf.reset_default_graph()
+
+        '''
         self.build_model()
 
-        if self.args.dkvmn_test == True:
+        if self.args.dkvmn_train != True:
             self.load()
+        #if self.args.dkvmn_test == True:
+            #self.load()
 
+        '''
+        '''
         elif self.args.dkvmn_train == False and self.args.dkvmn_test == False:
-            self.load()
             #self.logger.debug('Non training & testing')
-            print('Non training & testing')
             self.args.batch_size = 1
             self.args.seq_len = 1
+            #self.build_step_graph()
+            self.load()
+        '''
+
+        '''
+        graph = self.build_dkvmn_graph()
+        with tf.Session(config = run_confing, graph=graph) as sess:
+            self.set_session(sess)
+        '''
+             
+
+    def set_session(self, session):
+        self.sess = session
+
+    def build_dkvmn_graph(self):
+        graph = tf.Graph()
+        with graph.as_default():
+            self.using_counter_graph = tf.placeholder(tf.bool)
+            self.build_model()
+            #if self.args.dkvmn_train != True:
+                #self.build_step_graph()
+
+        return graph
+
+    def build_step_dkvmn_graph(self):
+        graph = tf.Graph()
+        with graph.as_default():
+            self.using_counter_graph = tf.placeholder(tf.bool)
+            self.build_model()
+            self.args.batch_size = 1
+            self.args.batch_size = 1
             self.build_step_graph()
+
+        return graph
 
     def get_init_counter(self):
         return np.zeros([1,self.args.n_questions+1])  
@@ -83,7 +121,7 @@ class DKVMNModel(_model_merged.Mixin):
         '''
         
         if self.args.show:
-            from utils import ProgressBar
+            from dkvmn_utils import ProgressBar
             bar = ProgressBar(label, max=training_step)
 
         self.train_count = 0
@@ -288,7 +326,7 @@ class DKVMNModel(_model_merged.Mixin):
         all_q = np.concatenate(q_list, axis=0)
 
         test_auc, test_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
-        #count, metric_for_each_q = dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
+        #count, metric_for_each_q = dkvmn_dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
         #print(metric_for_each_q)
         '''
         for (idx, metric) in enumerate(metric_for_each_q):
@@ -421,13 +459,14 @@ class DKVMNModel(_model_merged.Mixin):
 
 
     def load(self, checkpoint_dir=''):
+        self.logger.debug('Loading ckpt')
         if checkpoint_dir == '':
             checkpoint_dir = os.path.join(self.args.dkvmn_checkpoint_dir, self.model_dir)
-        #print(checkpoint_dir)
+        self.logger.debug(checkpoint_dir)
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-            #print(ckpt_name)
+            self.logger.debug(ckpt_name)
             self.train_count = int(ckpt_name.split('-')[-1])
 
             '''

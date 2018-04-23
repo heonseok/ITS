@@ -19,7 +19,7 @@ write_type_list = ['add_on_erase_on']
 learning_rate_list = [0.6]
 # 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
 
-counter_loss_weight_list = [0.0001]
+counter_loss_weight_list = [0.0002]
 #0.0, 0.001, 0.01, 0.1, 1.0
 
 counter_embedding_dim_list = [64]
@@ -63,7 +63,7 @@ for repeat_idx in range(repeat_num):
                                                 args_list.append('--repeat_idx')
                                                 args_list.append(str(repeat_idx))
 
-                                                args_list.append('--dkvmn_train f --dkvmn_test f --dkvmn_ideal_test f')
+                                                args_list.append('--dkvmn_train f --dkvmn_test t --dkvmn_ideal_test f')
                                                 args_list.append('--dqn_train f --dqn_test f')
 
                                                 args_list.append('--terminal_condition prob')

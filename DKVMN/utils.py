@@ -39,6 +39,9 @@ def calculate_auc_acc(target, pred):
 def set_logger(name, path, logging_level):
     logger = logging.getLogger(name)
 
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
     streamFormatter = logging.Formatter('[%(levelname)s] %(message)s')
     streamHandler = logging.StreamHandler()
     streamHandler.setFormatter(streamFormatter)

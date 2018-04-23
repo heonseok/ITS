@@ -54,6 +54,9 @@ def calculate_metric_for_each_q(target, pred, q, num_q):
 
 def set_logger(name, path, logging_level):
     logger = logging.getLogger(name)
+    
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
     streamFormatter = logging.Formatter('[%(levelname)s] %(message)s')
     streamHandler = logging.StreamHandler()
