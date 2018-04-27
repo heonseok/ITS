@@ -5,8 +5,58 @@ import operations
 
 class Mixin:
 
+    def inference_average_with_counter(self, value_matrix, counter):
+        # value_matrix: batch_size * memory_size * memory_dim
+        total_q = tf.range(1, self.args.n_questions+1)
+        # print(total_q.shape)
+        total_q_embeds = self.embedding_q(total_q)
+        # print(total_q_embeds.shape)
+        stacked_total_q_embeds = tf.tile(tf.expand_dims(total_q_embeds, 0), tf.stack([self.args.batch_size, 1,1]))
+        stacked_total_q_embeds = tf.reshape(stacked_total_q_embeds, [self.args.batch_size*self.args.n_questions, -1])
+
+        uniform_correlation_weight = tf.divide(tf.ones(shape=self.args.batch_size * self.args.memory_size, dtype=tf.float32), self.args.memory_size)
+        # print(uniform_correlation_weight.shape)
+        averaged_read_content = self.memory.value.read(value_matrix, uniform_correlation_weight)
+
+        stacked_averaged_read_content = tf.tile(tf.expand_dims(averaged_read_content,1), tf.stack([1, self.args.n_questions, 1]))
+        # print(stacked_averaged_read_content.shape)
+        stacked_averaged_read_content = tf.reshape(stacked_averaged_read_content, [self.args.batch_size*self.args.n_questions, -1])
+
+        counter_content_logit = operations.linear(tf.cast(counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
+        counter_content = tf.sigmoid(counter_content_logit)
+
+        # print('Counter_content')
+        # print(counter_content.shape)
+        stacked_counter_content = tf.tile(tf.expand_dims(counter_content, 1), tf.stack([1, self.args.n_questions, 1]))
+        stacked_counter_content  = tf.reshape(stacked_counter_content, [self.args.batch_size*self.args.n_questions, -1])
+        print(stacked_counter_content.shape)
+
+        summary_input = tf.concat([stacked_averaged_read_content, stacked_total_q_embeds, stacked_counter_content], 1)
+        print(summary_input.shape)
+
+        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Counter_Summary_Vector')
+        if self.args.summary_activation == 'tanh':
+            summary_vector = tf.tanh(summary_logit)
+        elif self.args.summary_activation == 'sigmoid':
+            summary_vector = tf.sigmoid(summary_logit)
+        elif self.args.summary_activation == 'relu':
+            summary_vector = tf.nn.relu(summary_logit)
+
+        # p_t
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
+
+        pred_prob = tf.sigmoid(pred_logits)
+        # print(pred_prob.shape)
+
+        return pred_prob
+        # return averaged_read_content, summary_vector, pred_logits, pred_prob
+
+
     def inference_with_counter(self, q_embed, correlation_weight, value_matrix, counter):
         read_content = self.memory.value.read(value_matrix, correlation_weight)
+        #print(q_embed.shape)
+        #print(value_matrix.shape)
+        #print(counter.shape)
 
         ##### ADD new FC layer for q_embedding. There is an layer in MXnet implementation
         #q_embed_content_logit = operations.linear(q_embed, 50, name='input_embed_content', reuse=reuse_flag)
@@ -76,7 +126,7 @@ class Mixin:
         #print('READ content shape')
         #print(read_content.shape)
 
-        zero_q_embed = tf.zeros(shape=[self.args.batch_size, self.args.memory_size, self.args.memory_key_state_dim]) 
+        zero_q_embed = tf.zeros(shape=[self.args.batch_size, self.args.memory_size, self.args.memory_key_state_dim])
         #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions]) 
 
         #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
@@ -105,21 +155,50 @@ class Mixin:
         return tf.sigmoid(pred_logits_reshaped)
         #self.concept_mastery_level = tf.sigmoid(pred_logits)
 
-    def calculate_pred_probs(self, value_matrix, counter):
+    '''
+    def calculate_pred_probs(self, value_matrix, counter, using_counter_graph):
+
+        ##### ATTENTION
         total_q_data = tf.constant(np.arange(1, self.args.n_questions+1))
-        stacked_total_q_data = tf.tile(tf.expand_dims(total_q_data, 0), tf.stack([self.args.batch_size, 1, 1]))
-        q_embeds = self.embedding_q(stacked_total_q_data)
+        #print(total_q_data.shape)
+
+        stacked_total_q_data = tf.tile(tf.expand_dims(total_q_data, 0), tf.stack([self.args.batch_size, 1]))
+        #print(stacked_total_q_data.shape)
+
+        stacked_total_q_data_reshaped = tf.reshape(stacked_total_q_data, [-1])
+        #stacked_total_q_data_reshaped = tf.reshape(stacked_total_q_data, [self.args.batch_size * self.args.n_questions, -1])
+        #print(stacked_total_q_data_reshaped.shape)
+
+        q_embeds = self.embedding_q(stacked_total_q_data_reshaped)
+        #print(q_embeds.shape)
+
+        #print(q_embeds_reshaped.shape)
+
         total_correlation_weight = self.memory.attention(q_embeds)
-        stacked_total_correlation_weight = tf.tile(tf.expand_dims(total_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
+        #print(total_correlation_weight.shape)
+
+    
+        ##### READ
+        #stacked_total_correlation_weight = tf.tile(tf.expand_dims(total_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
+        #print(stacked_total_correlation_weight.shape)
         
-       
-        stacked_total_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
-        stacked_total_counter = tf.tile(counter, tf.stack([self.args.n_questions, 1]))
+        #print(value_matrix.shape)
+        stacked_value_matrix = tf.tile(tf.expand_dims(value_matrix, 1), tf.stack([1, self.args.n_questions, 1, 1]))
+        #print(stacked_value_matrix.shape)
+        stacked_value_matrix_reshaped =  tf.reshape(stacked_value_matrix, [-1, self.args.memory_size, self.args.memory_value_state_dim])
+        #print(stacked_value_matrix_reshaped.shape)
+        #stacked_total_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([1, self.args.n_questions, 1, 1]))
+
+        #print(counter.shape)
+        stacked_counter = tf.tile(tf.expand_dims(counter, 1), tf.stack([1, self.args.n_questions, 1]))
+        #print(stacked_counter.shape)
+        stacked_counter_reshaped = tf.reshape(stacked_counter, [self.args.batch_size*self.args.n_questions, -1])
+        #print(stacked_counter_reshaped.shape)
         #_, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correlation_weight, stacked_total_value_matrix)
-        _, _, _, total_pred_probs = tf.cond(using_counter_graph, lambda:self.inference_with_counter(q_embeds, total_correlation_weight, stacked_total_value_matrix, stacked_total_counter), lambda:self.inference(q_embeds, total_correlation_weight, stacked_total_value_matrix))
+        _, _, _, total_pred_probs = tf.cond(using_counter_graph, lambda:self.inference_with_counter(q_embeds, total_correlation_weight, stacked_value_matrix_reshaped, stacked_counter_reshaped), lambda:self.inference(q_embeds, total_correlation_weight, stacked_value_matrix_reshaped))
 
         return total_pred_probs
-        
+    '''
 
     def build_memory(self):
         with tf.variable_scope('Memory', reuse=tf.AUTO_REUSE):
@@ -205,9 +284,12 @@ class Mixin:
         #mastery_level_list.append(mastery_level)
 
         self.q_counter  = tf.get_variable('self.q_counter', [self.args.batch_size, self.args.n_questions+1], dtype=tf.int32, initializer=tf.zeros_initializer, trainable=False)
-        self.counter_loss = 0
+        self.counter_loss = 0   
+        self.negative_loss_term = 0
 
         q_constant = tf.constant(np.arange(self.args.batch_size), dtype=tf.int32)
+        # TODO : add tf.cond for non-using counter case
+        prev_total_pred_probs = self.inference_average_with_counter(self.memory.memory_value, self.q_counter)
         # Logics
         for i in range(self.args.seq_len):
 
@@ -225,6 +307,8 @@ class Mixin:
             #counter = counter + one_hot_q
 
             q_embed = self.embedding_q(q)
+            #print('AAAAAAAAAAAAAAAAAAAAAAAAA')
+            #print(q_embed.shape)
             #counter = counter + q_embed
             qa_embed = self.embedding_qa(qa)
 
@@ -235,8 +319,8 @@ class Mixin:
             mastery_level = self.calculate_mastery_level(self.memory.memory_value)
             #mastery_level = self.calculate_mastery_level(self.stacked_init_memory_value)
 
-            #prev_total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter)
-            #print(total_pred_probs.shape)
+            #prev_total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter, self.using_counter_graph)
+            #print(prev_total_pred_probs.shape)
                 
             prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = tf.cond(self.using_counter_graph, lambda:self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, self.q_counter), lambda:self.inference(q_embed, correlation_weight, self.memory.memory_value))
             #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference_with_counter(q_embed, correlation_weight, self.memory.memory_value, reuse_flag, counter)
@@ -247,19 +331,30 @@ class Mixin:
             self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
 
             mastery_level = self.calculate_mastery_level(self.memory.memory_value)
-            #total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter)
+            #total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter, self.using_counter_graph)
+            total_pred_probs = self.inference_average_with_counter(self.memory.memory_value, self.q_counter)
+
             mastery_level_list.append(mastery_level)
+
+            total_pred_probs_diff = total_pred_probs - prev_total_pred_probs
+            prev_total_pred_probs = total_pred_probs
 
 
             ## calculate counter loss
             ## TODO : remove -1 target.
             valid_idx = tf.where(tf.not_equal(target, tf.constant(-1, dtype=tf.float32)))
             #print('valid_idx : ' + str(valid_idx))
-            valid_q = tf.gather(q, valid_idx)
+            #valid_q = tf.gather(q, valid_idx)
             #valid_q = tf.squeeze(tf.gather(q, valid_idx))
             #print('valid_q : ' + str(valid_q))
 
             p = tf.gather(tf.sigmoid(prev_pred_logit) , valid_idx)
+
+            probs_diff = tf.gather(total_pred_probs_diff, valid_idx)
+            negative_idx = tf.where(tf.less(probs_diff, 0))
+            probs_diff_negative = tf.gather_nd(probs_diff, negative_idx)
+
+            self.negative_loss_term += tf.reduce_mean(tf.square(probs_diff_negative))
             '''
             print(p.shape)
             print((-p*tf.log(p)).shape)
@@ -309,8 +404,10 @@ class Mixin:
         filtered_target = tf.gather(target_1d, index)
         filtered_logits = tf.gather(pred_logits_1d, index)
 
-
-        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target)) + self.args.counter_loss_weight*self.counter_loss
+ 
+        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target)) +\
+                    self.args.counter_loss_weight * self.counter_loss +\
+                    self.args.decrease_loss_weight * self.negative_loss_term
         #self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
 
         # Optimizer : SGD + MOMENTUM with learning rate decay

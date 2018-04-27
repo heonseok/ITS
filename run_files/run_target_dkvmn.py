@@ -63,7 +63,7 @@ for repeat_idx in range(repeat_num):
                                                 args_list.append('--repeat_idx')
                                                 args_list.append(str(repeat_idx))
 
-                                                args_list.append('--dkvmn_train f --dkvmn_test t --dkvmn_ideal_test f')
+                                                args_list.append('--dkvmn_train t --dkvmn_test t --dkvmn_ideal_test f')
                                                 args_list.append('--dqn_train f --dqn_test f')
 
                                                 args_list.append('--terminal_condition prob')
@@ -79,6 +79,9 @@ for repeat_idx in range(repeat_num):
 
                                                 args_list.append('--counter_loss_weight')
                                                 args_list.append(str(counter_loss_weight))
+
+                                                args_list.append('--decrease_loss_weight')
+                                                args_list.append(str(0.0001))
 
                                                 args_list.append('--gpu_id 0')
                                                 args_list.append('--logging_level DEBUG')

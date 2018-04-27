@@ -13,7 +13,9 @@ from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
+#import _model
 import _model_merged
+#import _model_merged_multi
 
 class DKVMNModel(_model_merged.Mixin):
     def __init__(self, args, name='KT'):
@@ -453,7 +455,12 @@ class DKVMNModel(_model_merged.Mixin):
         else:
             dataset_detail = '_{}'.format(self.args.dataset)
         
-        return network_spec + network_detail + counter_detail + dataset_detail + repeat_detail
+        if self.args.decrease_loss_weight == 0.0:
+            decrease_weight_detail = ''
+        else:
+            decrease_weight_detail = '_dLossWeight_{}'.format(self.args.decrease_loss_weight)
+
+        return network_spec + network_detail + counter_detail + decrease_weight_detail + dataset_detail + repeat_detail
         #return self.args.prefix + network_spec + network_detail + counter_detail + repeat_detail
         #return self.args.prefix + network_spec + network_detail + remove_short
 
