@@ -90,7 +90,7 @@ class DKVMNModel(_model_refactored.Mixin):
     def get_mastery_level(self, value_matrix, counter):
         feed_dict = {self.value_matrix: value_matrix, self.counter: counter,
                      self.using_counter_graph: self.args.using_counter_graph}
-        return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict=feed_dict))
+        return np.squeeze(self.sess.run(self.concept_mastery, feed_dict=feed_dict))
 
     def update_value_matrix(self, value_matrix, action, answer, counter):
         ops = [self.stepped_value_matrix]
@@ -99,7 +99,6 @@ class DKVMNModel(_model_refactored.Mixin):
         value_matrix = self.sess.run(ops, feed_dict=feed_dict)
         return np.squeeze(value_matrix)
 
-    @staticmethod
     def expand_dims(self, val):
         return np.expand_dims(np.expand_dims(val, axis=0), axis=0)
 
