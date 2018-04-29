@@ -72,9 +72,8 @@ def setup():
 
     parser.add_argument('--using_counter_graph', type=str2bool, default='t')
     parser.add_argument('--counter_embedding_dim', type=int, default=64)
-    #parser.add_argument('--using_counter_loss', type=str2bool, default='f')
-    parser.add_argument('--counter_loss_weight', type=float, default=0.0)
-    parser.add_argument('--decrease_loss_weight', type=float, default=0.0)
+    parser.add_argument('--convergence_loss_weight', type=float, default=0.0)
+    parser.add_argument('--negative_influence_loss_weight', type=float, default=0.0)
 
     #parser.add_argument('--using_weighted_update', type=str2bool, default='f')
     #parser.add_argument('--weighted_update_type', type=str, choices=['prob_diff, softmax'], default='prob_diff')

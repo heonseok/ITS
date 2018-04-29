@@ -169,20 +169,20 @@ class Mixin:
     # TODO : It should input value matrix/ counter?
     def calc_mastery(self, value_matrix, counter):
         zero_q_embed = tf.zeros(shape=[self.args.batch_size, self.args.memory_size, self.args.key_memory_dim])
-        #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions])
+        # zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions])
 
-        #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
-        #zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
+        # zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
+        # zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
 
         one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
         stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
-        #stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
+        # stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
         stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 1), tf.stack([1, self.args.memory_size, 1, 1]))
 
         # read_content : batch_size memory_size memory_state_dim
         read_content = self.memory.value.read_for_mastery(stacked_mastery_value_matrix, stacked_one_hot_correlation_weight)
-        #read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
-        #print(read_content.shape)
+        # read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
+        # print(read_content.shape)
 
         # summary
         summary_input = tf.concat([read_content, zero_q_embed], 2)
@@ -315,8 +315,10 @@ class Mixin:
 
             # write
             qa_embed = self.embedding_qa(qa)
-            knowledge_growth = self.extend_knowledge_growth(self.memory.memory_value, qa_embed, read, summary, prob, prev_mastery)
-            self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
+            knowledge_growth = \
+                self.extend_knowledge_growth(self.memory.memory_value, qa_embed, read, summary, prob, prev_mastery)
+            self.memory.memory_value = \
+                self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
 
             # update prev variables
             mastery = self.calc_mastery(self.memory.memory_value, self.q_counter)
@@ -369,11 +371,12 @@ class Mixin:
         filtered_target = tf.gather(target_1d, index)
         filtered_logits = tf.gather(pred_logits_1d, index)
 
-        self.ce_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
-        self.negative_influence_loss = self.args.decrease_loss_weight * negative_influence_loss_term
-        self.convergence_loss = self.args.counter_loss_weight * convergence_loss_term
+        self.cross_entropy_loss = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
+        self.negative_influence_loss = self.args.negative_influence_loss_weight * negative_influence_loss_term
+        self.convergence_loss = self.args.convergence_loss_weight * convergence_loss_term
 
-        self.loss = self.ce_loss + self.negative_influence_loss + self.convergence_loss
+        self.loss = self.cross_entropy_loss + self.negative_influence_loss + self.convergence_loss
 
         # Optimizer : SGD + MOMENTUM with learning rate decay
         self.global_step = tf.Variable(0, trainable=False)
@@ -439,18 +442,18 @@ class Mixin:
         # 0, 1 for given answer
         self.qa = tf.cond(tf.squeeze(a) < 0,
                           lambda: self.sampling_a_given_q(q, stacked_value_matrix),
-                          lambda: q + tf.multiply(a, self.args.n_questions)
-                          )
+                          lambda: q + tf.multiply(a, self.args.n_questions) )
 
         a = (self.qa-1) // self.args.n_questions
         qa_embed = self.embedding_qa(self.qa)
 
         # before Step
-        prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
-        prev_mastery_level = self.calc_mastery_level(stacked_value_matrix)
+        read, summary, prob_logit, prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
+        # prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
+        mastery = self.calc_mastery_level(stacked_value_matrix)
 
         # step
-        knowledge_growth = self.extend_knowledge_growth(stacked_value_matrix, qa_embed, prev_read_content, prev_summary, prev_pred_prob, prev_mastery_level)
+        knowledge_growth = self.extend_knowledge_growth(stacked_value_matrix, qa_embed, read, summary, prob, mastery)
         # TODO : refactor sampling_a_given_q to return a only for below function call
         self.stepped_value_matrix = tf.squeeze(self.memory.value.write_given_a(stacked_value_matrix, correlation_weight, knowledge_growth, a), axis=0)
 

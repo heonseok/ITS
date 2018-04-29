@@ -4,8 +4,6 @@ import tensorflow as tf
 import operations
 import shutil
 from memory import DKVMN
-#rom sklearn.metrics import roc_auc_score
-#from sklearn.metrics import accuracy_score
 
 import dkvmn_utils
 
@@ -20,17 +18,15 @@ import _model_refactored
 
 class DKVMNModel(_model_refactored.Mixin):
     def __init__(self, args, name='KT'):
-    #def __init__(self, args, sess, name='KT'):
 
         self.args = args
         self.name = name
-        #self.sess = sess
 
-        #tf.set_random_seed(224)
+        # tf.set_random_seed(224)
         self.logger = dkvmn_utils.set_logger('DKVMN', self.args.prefix + 'dkvmn.log', self.args.logging_level)
         self.model_name = 'DKVMN'
 
-        #tf.reset_default_graph()
+        # tf.reset_default_graph()
 
         '''
         self.build_model()
@@ -56,7 +52,6 @@ class DKVMNModel(_model_refactored.Mixin):
             self.set_session(sess)
         '''
              
-
     def set_session(self, session):
         self.sess = session
 
@@ -65,8 +60,8 @@ class DKVMNModel(_model_refactored.Mixin):
         with graph.as_default():
             self.using_counter_graph = tf.placeholder(tf.bool)
             self.build_model()
-            #if self.args.dkvmn_train != True:
-                #self.build_step_graph()
+            # if self.args.dkvmn_train != True:
+                # self.build_step_graph()
 
         return graph
 
@@ -88,24 +83,30 @@ class DKVMNModel(_model_refactored.Mixin):
         return self.sess.run(self.init_memory_value)
 
     def get_prediction_probability(self, value_matrix, counter):
-        return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.value_matrix: value_matrix, self.counter: counter, self.using_counter_graph: self.args.using_counter_graph}))
-        #return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict={self.total_value_matrix: value_matrix, self.total_counter: counter, self.total_using_counter_graph: self.args.using_counter_graph}))
+        feed_dict = {self.value_matrix: value_matrix, self.counter: counter,
+                     self.using_counter_graph: self.args.using_counter_graph}
+        return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict=feed_dict))
 
     def get_mastery_level(self, value_matrix, counter):
-        return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict={self.value_matrix: value_matrix, self.counter: counter, self.using_counter_graph: self.args.using_counter_graph}))
-        #return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict={self.mastery_value_matrix: value_matrix, self.mastery_counter: counter, self.mastery_using_counter_graph: self.args.using_counter_graph}))
-    
-    def update_value_matrix(self, value_matrix, action, answer, counter):
-       ops = [self.stepped_value_matrix]
-       value_matrix = self.sess.run(ops, feed_dict={self.q: action, self.a: answer, self.value_matrix: value_matrix, self.counter: counter, self.using_counter_graph: self.args.using_counter_graph})
-       return np.squeeze(value_matrix)
+        feed_dict = {self.value_matrix: value_matrix, self.counter: counter,
+                     self.using_counter_graph: self.args.using_counter_graph}
+        return np.squeeze(self.sess.run(self.concept_mastery_level, feed_dict=feed_dict))
 
+    def update_value_matrix(self, value_matrix, action, answer, counter):
+        ops = [self.stepped_value_matrix]
+        feed_dict = {self.q: action, self.a: answer, self.value_matrix: value_matrix, self.counter: counter,
+                     self.using_counter_graph: self.args.using_counter_graph}
+        value_matrix = self.sess.run(ops, feed_dict=feed_dict)
+        return np.squeeze(value_matrix)
+
+    @staticmethod
     def expand_dims(self, val):
         return np.expand_dims(np.expand_dims(val, axis=0), axis=0)
 
+    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False,
+              checkpoint_dir='', selected_mastery_index=-1):
 
-    def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False, checkpoint_dir='', selected_mastery_index=-1):
-        #np.random.seed(224)
+        # np.random.seed(224)
         # q_data, qa_data : [samples, seq_len]
         self.logger.info('#'*120)
         self.logger.info(self.model_dir)
@@ -128,7 +129,7 @@ class DKVMNModel(_model_refactored.Mixin):
             bar = ProgressBar(label, max=training_step)
 
         self.train_count = 0
-        #if self.args.init_from:
+        # if self.args.init_from:
         '''
         if self.load():
             self.logger.debug('Checkpoint exists')
@@ -177,8 +178,15 @@ class DKVMNModel(_model_refactored.Mixin):
                 target_batch = (target - 1) // self.args.n_questions  
                 target_batch = target_batch.astype(np.float)
 
-                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch, self.lr:lr, self.selected_mastery_index:selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
-                loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
+                op = [self.loss, self.pred, self.train_op,
+                      self.cross_entropy_loss, self.negative_influence_loss, self.convergence_loss]
+
+                feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch,
+                             self.lr:lr, self.selected_mastery_index:selected_mastery_index,
+                             self.using_counter_graph:self.args.using_counter_graph}
+
+                loss_, pred_, _, ce_loss, ni_loss, co_loss = self.sess.run(op, feed_dict=feed_dict)
+                # loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
 
                 pred_ = pred_[:,selected_mastery_index+1:] 
                 target_batch = target_batch[:,selected_mastery_index+1:]
@@ -189,13 +197,13 @@ class DKVMNModel(_model_refactored.Mixin):
                 right_pred = np.asarray(pred_).reshape(-1,1)
                 # np.flatnonzero returns indices which is nonzero, convert it list 
                 right_index = np.flatnonzero(right_target != -1.).tolist()
-                #print(len(right_index)/self.args.batch_size)
+                # print(len(right_index)/self.args.batch_size)
                 # Number of 'training_step' elements list with [batch size * seq_len, ]
                 pred_list.append(right_pred[right_index])
                 target_list.append(right_target[right_index])
 
                 epoch_loss += loss_
-                #print('Epoch %d/%d, steps %d/%d, loss : %3.5f' % (epoch+1, self.args.num_epochs, steps+1, training_step, loss_))
+                # print('Epoch %d/%d, steps %d/%d, loss : %3.5f' % (epoch+1, self.args.num_epochs, steps+1, training_step, loss_))
                 
 
             if self.args.show:
@@ -207,8 +215,10 @@ class DKVMNModel(_model_refactored.Mixin):
 
             train_auc, train_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
             epoch_loss = epoch_loss / training_step    
-            self.logger.debug('Epoch %d/%d, loss : %3.5f, auc : %3.5f, accuracy : %3.5f' % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy))
-            #self.write_log(epoch=epoch+1, auc=train_auc, accuracy=train_accuracy, loss=epoch_loss, name='training_')
+            self.logger.debug('Epoch %d/%d, loss : %3.5f, auc : %3.5f, acc : %3.5f ce: %3.5f, ni: %3.5f, co: %3.5f'
+                              % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy, ce_loss, ni_loss, co_loss))
+            # self.logger.debug('Epoch %d/%d, loss : %3.5f, auc : %3.5f, accuracy : %3.5f' % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy))
+            # self.write_log(epoch=epoch+1, auc=train_auc, accuracy=train_accuracy, loss=epoch_loss, name='training_')
 
             valid_steps = valid_q_data.shape[0] // self.args.batch_size
             valid_pred_list = list()
@@ -239,7 +249,7 @@ class DKVMNModel(_model_refactored.Mixin):
             valid_auc, valid_accuracy = dkvmn_utils.calculate_metric(all_valid_target, all_valid_pred)
             self.logger.debug('Epoch %d/%d, valid auc : %3.5f, valid accuracy : %3.5f' %(epoch+1, self.args.num_epochs, valid_auc, valid_accuracy))
             # Valid log
-            #self.write_log(epoch=epoch+1, auc=valid_auc, accuracy=valid_accuracy, loss=valid_loss, name='valid_')
+            # self.write_log(epoch=epoch+1, auc=valid_auc, accuracy=valid_accuracy, loss=valid_loss, name='valid_')
             if valid_auc > best_valid_auc:
                 self.logger.debug('%3.4f to %3.4f' % (best_valid_auc, valid_auc))
                 best_valid_auc = valid_auc
@@ -262,7 +272,7 @@ class DKVMNModel(_model_refactored.Mixin):
         self.logger.info('Test')
 
         steps = test_q.shape[0] // self.args.batch_size
-        #self.sess.run(tf.global_variables_initializer())
+        # self.sess.run(tf.global_variables_initializer())
 
         '''
         if self.load(checkpoint_dir):
@@ -278,7 +288,7 @@ class DKVMNModel(_model_refactored.Mixin):
         q_list = list()
 
         for s in range(steps):
-            #self.writer.add_summary(s)
+            # self.writer.add_summary(s)
 
             test_q_batch = test_q[s*self.args.batch_size:(s+1)*self.args.batch_size, :]
             test_qa_batch = test_qa[s*self.args.batch_size:(s+1)*self.args.batch_size, :]
@@ -288,8 +298,8 @@ class DKVMNModel(_model_refactored.Mixin):
                             
             target_batch = target_batch.astype(np.float)
 
-            ## meta graph version
-            #feed_dict = {"q_data_seq:0":test_q_batch, "qa_data:0":test_qa_batch, "target:0":target_batch, "selected_mastery_index:0":selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
+            # meta graph version
+            # feed_dict = {"q_data_seq:0":test_q_batch, "qa_data:0":test_qa_batch, "target:0":target_batch, "selected_mastery_index:0":selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
 
             feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch, self.selected_mastery_index:selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
             loss_, pred_ = self.sess.run([self.loss, self.pred], feed_dict=feed_dict)
@@ -326,23 +336,21 @@ class DKVMNModel(_model_refactored.Mixin):
 
         all_pred = np.concatenate(pred_list, axis=0)
         all_target = np.concatenate(target_list, axis=0)
-        all_q = np.concatenate(q_list, axis=0)
+        # all_q = np.concatenate(q_list, axis=0)
 
         test_auc, test_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
-        #count, metric_for_each_q = dkvmn_dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
-        #print(metric_for_each_q)
+        # count, metric_for_each_q = dkvmn_dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
+        # print(metric_for_each_q)
         '''
         for (idx, metric) in enumerate(metric_for_each_q):
             self.logger.info('{:<3d}: {:>7d}, {: .4f}, {: .4f}'.format(idx+1, count[idx], metric[0], metric[1]))
         '''
 
         self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
-        #self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
+        # self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
         return pred_list_2d, target_list_2d, test_auc, test_accuracy
         
-
-
     def clustering_actions(self):
         '''
         if self.load():
@@ -352,13 +360,13 @@ class DKVMNModel(_model_refactored.Mixin):
         '''
 
         value_matrix = self.get_init_value_matrix()
-        #value_matrix = self.sess.run(self.init_memory_value)
+        # value_matrix = self.sess.run(self.init_memory_value)
 
         total_cor_weight = self.sess.run(self.total_correlation_weight, feed_dict={self.total_value_matrix : value_matrix})
     
         kmeans = KMeans(n_clusters=self.args.memory_size).fit(total_cor_weight)
-        #print('kmeans centers')
-        #print(kmeans.cluster_centers_)
+        # print('kmeans centers')
+        # print(kmeans.cluster_centers_)
         cluster_labels = kmeans.predict(total_cor_weight)
 
         vis_weight = TSNE().fit_transform(total_cor_weight)
@@ -373,20 +381,17 @@ class DKVMNModel(_model_refactored.Mixin):
         #'''
         for _id, label, x, y in zip(ids, cluster_labels, vis_x, vis_y):
             plt.annotate('{}'.format(_id), xy = (x,y))
-            #plt.annotate('{},{}'.format(label, _id), xy = (x,y))
+            # plt.annotate('{},{}'.format(label, _id), xy = (x,y))
         #'''
 
         plt.show()
-        
-
 
     def ideal_test(self):
         type_list = [-1]
         for t in type_list: 
             self.ideal_test_given_type(t) 
     
-
-    def ideal_test_given_type(self, input_type): 
+    def ideal_test_given_type(self, input_type):
         
         '''
         if self.load():
@@ -426,45 +431,40 @@ class DKVMNModel(_model_refactored.Mixin):
 
     @property
     def model_dir(self):
-        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_cLossWeight_{}_Counter_{}'.format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_activation, self.args.erase_activation, self.args.write_type, self.args.counter_loss_weight, self.args.using_counter_graph)
- 
-        if network_spec == 'Knowledge_origin_Summary_tanh_Add_tanh_Erase_sigmoid_WriteType_add_on_erase_on_cLossWeight_0.0_Counter_False':
-            network_spec = 'Original'
+        '''
+        network_spec = 'Knowledge_{}_Summary_{}_Add_{}_Erase_{}_WriteType_{}_Counter_{}_coLoss_{}' \
+            .format(self.args.knowledge_growth, self.args.summary_activation, self.args.add_activation, self.args.erase_activation, self.args.write_type, self.args.convergence_loss_weight, self.args.using_counter_graph)
+        '''
 
-        hyper_parameters = '_lr{}_{}epochs'.format(self.args.initial_lr, self.args.num_epochs)
-        network_detail = '_MemSize{}'.format(self.args.memory_size)
-        #hyper_parameters = '_lr{}_{}epochs_{}batch'.format(self.args.initial_lr, self.args.num_epochs, self.args.batch_size)
-        #data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
-        #remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
-        
-        # TODO refactoring if/else statement
+        # hyper_parameters = '_lr{}_{}epochs'.format(self.args.initial_lr, self.args.num_epochs)
+        # data_postfix = '_{}_{}_{}'.format(self.args.train_postfix, self.args.valid_postfix, self.args.test_postfix)
+        # remove_short = '_RemoveShort_{}_th_{}'.format(self.args.remove_short_seq, self.args.short_seq_len_th)
 
         '''
-        if self.args.counter_embedding_dim == 20:
-            counter_detail = ''
-        else:
-            counter_detail = 'cDim_{}'.format(self.args.counter_embedding_dim)
-        '''
-        counter_detail = 'cDim_{}'.format(self.args.counter_embedding_dim)
-
-        batch = '_batch_{}'.format(self.args.batch_size) 
-
-        repeat_detail = '_rIdx_{}'.format(self.args.repeat_idx)
-    
         if self.args.dataset == 'assist2009_updated':
-            dataset_detail = ''
+            dataset_spec = ''
         else:
-            dataset_detail = '_{}'.format(self.args.dataset)
-        
-        if self.args.decrease_loss_weight == 0.0:
-            decrease_weight_detail = ''
+            dataset_spec = '_{}'.format(self.args.dataset)
+        '''
+        '''
+        if self.args.negative_influence_loss_weight == 0.0:
+            ni_weight_spec = ''
         else:
-            decrease_weight_detail = '_dLossWeight_{}'.format(self.args.decrease_loss_weight)
+            ni_weight_spec = '_niLoss_{}'.format(self.args.negative_influence_loss_weight)
+        '''
 
-        return network_spec + network_detail + counter_detail + decrease_weight_detail + dataset_detail + repeat_detail
-        #return self.args.prefix + network_spec + network_detail + counter_detail + repeat_detail
-        #return self.args.prefix + network_spec + network_detail + remove_short
+        network_spec = 'Knowledge_{}_Summary_{}_MemSize{}'.\
+            format(self.args.knowledge_growth, self.args.summary_activation, self.args.memory_size)
 
+        counter_spec = '_Counter_{}_cDim_{}'.format(self.args.using_counter_graph, self.args.counter_embedding_dim)
+
+        ni_weight_spec = '_niLoss_{}'.format(self.args.negative_influence_loss_weight)
+        co_weight_spec = '_coLoss_{}'.format(self.args.convergence_loss_weight)
+
+        repeat_spec = '_rIdx_{}'.format(self.args.repeat_idx)
+
+        return network_spec + counter_spec + ni_weight_spec + co_weight_spec + repeat_spec
+        # return network_spec + network_detail + counter_detail + ni_weight_detail + dataset_detail + repeat_detail
 
     def load(self, checkpoint_dir=''):
         self.logger.debug('Loading ckpt')
@@ -482,7 +482,6 @@ class DKVMNModel(_model_refactored.Mixin):
             self.new_saver = tf.train.import_meta_graph(os.path.join(checkpoint_dir, ckpt_name+'.meta'))
             self.logger.debug('DKVMN graph loaded')
             self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-
             '''
 
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
@@ -491,7 +490,6 @@ class DKVMNModel(_model_refactored.Mixin):
         else:
             self.logger.debug('DKVMN cktp not loaded')
             return False
-
 
     '''
     @property
@@ -510,7 +508,6 @@ class DKVMNModel(_model_refactored.Mixin):
         if not os.path.exists(checkpoint_dir):
             os.mkdir(checkpoint_dir)
         self.saver.save(self.sess, os.path.join(checkpoint_dir, self.model_name), global_step=global_step)
-        #self.saver.save(self.sess, os.path.join(checkpoint_dir, self.model_name), global_step=global_step, write_meta_graph=False)
         self.logger.debug('Save checkpoint at %d' % (global_step+1))
 
     # Log file
@@ -526,4 +523,3 @@ class DKVMNModel(_model_refactored.Mixin):
         self.log_file.write(str(epoch) + '\t' + str(auc) + '\t' + str(accuracy) + '\t' + str(loss) + '\n')
         self.log_file.flush()    
     '''
-        
