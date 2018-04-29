@@ -30,12 +30,15 @@ class Mixin:
             self.qa_embed_mtx = tf.get_variable('qa_embed', [2*self.args.n_questions+1, self.args.memory_value_state_dim], initializer=tf.random_normal_initializer(stddev=0.1))
             #self.qa_embed_mtx = tf.get_variable('qa_embed', [2*self.args.n_questions+1, self.args.memory_value_state_dim], initializer=tf.truncated_normal_initializer(stddev=0.1))
 
-
     def embedding_q(self, q):
         return tf.nn.embedding_lookup(self.q_embed_mtx, q)
 
     def embedding_qa(self, qa):
         return tf.nn.embedding_lookup(self.qa_embed_mtx, qa)
+
+    def embedding_counter(self, counter):
+        counter_embed_logit = operations.linear(tf.cast(counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
+        return tf.sigmoid(counter_embed_logit)
 
     def apply_summary_activation(self, summary_logit):
         if self.args.summary_activation == 'tanh':
@@ -47,18 +50,6 @@ class Mixin:
 
         return summary_vector
 
-    def inference_with_condition(self, q_embed, correlation_weight, value_matrix, counter):
-        ###############################################################################################################
-        # Output
-        # read_content, summary, pred_logit, pred_prob
-        ###############################################################################################################
-        return self.inference_with_counter(q_embed, correlation_weight, value_matrix, counter),
-        '''
-        return tf.cond(self.using_counter_graph,
-                       lambda:self.inference_with_counter(q_embed, correlation_weight, value_matrix, counter),
-                       lambda:self.inference(q_embed, correlation_weight, value_matrix)
-                      )
-        '''
     def get_total_q(self):
         pass
 
@@ -68,7 +59,154 @@ class Mixin:
     def get_summary(self):
         pass
 
-    def inference_average_with_counter(self, value_matrix, counter):
+    def calc_summary(self, read_content, q_embed):
+        ###############################################################################################################
+        # Input
+        # read_content       (2dim) : [ batch_size, value_memory_dim ]
+        # q_embeds           (2dim) : [ batch_size, key_memory_dim ]
+
+        # Output
+        # summary            (2dim) : [ batch_size, summary_dim ]
+        ###############################################################################################################
+
+        summary_input = tf.concat([read_content, q_embed], 1)
+        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Summary_Vector')
+        return self.apply_summary_activation(summary_logit)
+
+    def calc_summary_with_counter(self, read_content, q_embed, counter_embed):
+        ###############################################################################################################
+        # Input
+        # read_content       (2dim) : [ batch_size, value_memory_dim ]
+        # q_embeds           (2dim) : [ batch_size, key_memory_dim ]
+        # counter_embed      (2dim) : [ batch_size, counter_embed_dim ]
+
+        # Output
+        # summary            (2dim) : [ batch_size, summary_dim ]
+        ###############################################################################################################
+
+        summary_input = tf.concat([read_content, q_embed, counter_embed], 1)
+        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Counter_Summary_Vector')
+        return self.apply_summary_activation(summary_logit)
+
+    '''
+    def inference_backup(self, q_embed, correlation_weight, value_matrix, counter):
+        ###############################################################################################################
+        # -1 dim
+        # TODO : renaming functions
+        # attention : batch_size
+        # step : n_question
+        # uniform : bach_size*n_questions
+
+        # Input
+        # q_embeds           (2dim) : [ -1, key_memory_dim ]
+        # correlation_weight (2dim) : [ -1, memory_size ]
+        # value_matrix       (3dim) : [ -1, memory_size, value_memory_dim ]
+        # counter            (2dim) : [ -1, n_questions+1 ]
+
+        # Output
+        # read_content       (2dim) : [ -1, value_memory_dim ]
+        # summary            (2dim) : [ -1, summary_dim ]
+        # Probability        (2dim) : [ -1, 1 ]
+
+        # Intermediate
+        # counter_embeds     (2dim) : [ -1, counter_embed_dim ]
+        ###############################################################################################################
+
+        # read content
+        read_content = self.memory.value.read(value_matrix, correlation_weight)
+
+        # counter
+        counter_content_logit = operations.linear(tf.cast(counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
+        counter_content = tf.sigmoid(counter_content_logit)
+
+        # summary
+        summary_vector = tf.cond(self.using_counter_graph,
+                                 lambda:self.calc_summary_with_counter(read_content, q_embed, counter_content),
+                                 lambda:self.calc_summary(read_content, q_embed)
+                                 )
+
+        # probabiltiy for input question
+        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
+        pred_prob = tf.sigmoid(pred_logits)
+
+        return read_content, summary_vector, pred_logits, pred_prob
+    '''
+
+    def inference(self, q_embed, read_content, counter_embed):
+        ###############################################################################################################
+        # -1 dim
+        # TODO : renaming functions
+        # attention : batch_size
+        # step : n_question
+        # uniform : bach_size*n_questions
+
+        # Input should be reshaped to below form
+        # q_embed            (2dim) : [ -1, key_memory_dim ]
+        # read_content       (2dim) : [ -1, value_memory_dim ]
+        # counter_embed      (2dim) : [ -1, n_questions+1 ]
+
+        # Output
+        # read_content       (2dim) : [ -1, value_memory_dim ]
+        # summary            (2dim) : [ -1, summary_dim ]
+        # Probability        (2dim) : [ -1, 1 ]
+        ###############################################################################################################
+
+        # reshape
+        q_embed = tf.reshape(q_embed, [-1, self.args.memory_key_state_dim])
+        read_content = tf.reshape(read_content, [-1, self.args.memory_value_state_dim])
+        counter_embed = tf.reshape(counter_embed, [-1, self.args.counter_embedding_dim])
+
+        # summary
+        summary = tf.cond(self.using_counter_graph,
+                          lambda: self.calc_summary_with_counter(read_content, q_embed, counter_embed),
+                          lambda: self.calc_summary(read_content, q_embed)
+                         )
+
+        # probability for input question
+        prob_logit = operations.linear(summary, 1, name='Prediction')
+        prob = tf.sigmoid(prob_logit)
+
+        return read_content, summary, prob_logit, prob
+
+    def total_inference(self, value_matrix, counter):
+
+        total_q = tf.constant(tf.range(1,self.args.n_questions+1))
+
+        q_embed = self.embedding_q(total_q)
+
+        self.total_correlation_weight = self.memory.attention(q_embed)
+
+        stacked_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
+        stacked_read = self.memory.value.read(stacked_value_matrix, self.total_correlation_weight)
+
+        counter_embed = self.embedding_counter(counter)
+        stacked_counter_embed = tf.tile(counter_embed, tf.stack([self.args.n_questions, 1]))
+
+        _, _, _, self.total_pred_probs = self.inference(q_embed, stacked_read, stacked_counter_embed)
+
+    def total_uniform_inference(self, value_matrix, counter):
+
+        total_q = tf.range(1, self.args.n_questions+1)
+
+        q_embed = self.embedding_q(total_q)
+
+        uniform_correlation_weight = tf.ones(self.args.batch_size*self.args.memory_size, tf.float32)
+        uniform_correlation_weight = tf.divide(uniform_correlation_weight, self.args.memory_size)
+
+        read = self.memory.value.read(value_matrix, uniform_correlation_weight)
+
+        counter_embed = self.embedding_counter(tf.cast(counter, tf.float32))
+
+        stacked_q_embed = tf.tile(tf.expand_dims(q_embed, 0), tf.stack([self.args.batch_size, 1,1]))
+        stacked_read = tf.tile(tf.expand_dims(read, 1), tf.stack([1, self.args.n_questions, 1]))
+        stacked_counter_embed = tf.tile(tf.expand_dims(counter_embed, 1), tf.stack([1, self.args.n_questions, 1]))
+
+        _, _, _, prob = self.inference(stacked_q_embed, stacked_read, stacked_counter_embed)
+        return prob
+
+
+    '''
+    def inference_average(self, value_matrix, counter):
         ###############################################################################################################
         # Input
         # value_matrix   (3dim) : [ batch_size, memory_size, value_memory_dim ]
@@ -93,7 +231,6 @@ class Mixin:
         # read content : not using attention mechanism
         uniform_correlation_weight = tf.divide(tf.ones(shape=self.args.batch_size * self.args.memory_size, dtype=tf.float32), self.args.memory_size)
         averaged_read_content = self.memory.value.read(value_matrix, uniform_correlation_weight)
-
         stacked_averaged_read_content = tf.tile(tf.expand_dims(averaged_read_content,1), tf.stack([1, self.args.n_questions, 1]))
         stacked_averaged_read_content = tf.reshape(stacked_averaged_read_content, [self.args.batch_size*self.args.n_questions, -1])
 
@@ -105,97 +242,16 @@ class Mixin:
         stacked_counter_content  = tf.reshape(stacked_counter_content, [self.args.batch_size*self.args.n_questions, -1])
 
         # summary
-        summary_input = tf.concat([stacked_averaged_read_content, stacked_total_q_embeds, stacked_counter_content], 1)
-        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Counter_Summary_Vector')
-        summary_vector = self.apply_summary_activation(summary_logit)
+        summary_vector = tf.cond(self.using_counter_graph,
+                                 lambda:self.calc_summary_with_counter(stacked_averaged_read_content, stacked_total_q_embeds, stacked_counter_content),
+                                 lambda:self.calc_summary(stacked_averaged_read_content, stacked_total_q_embeds)
+                                 )
 
         # probability for all questions
         pred_logits = operations.linear(summary_vector, 1, name='Prediction')
         pred_prob = tf.sigmoid(pred_logits)
 
         return pred_prob
-
-    def calc_summary(self, read_content, q_embed):
-        summary_input = tf.concat([read_content, q_embed], 1)
-        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Summary_Vector')
-        return self.apply_summary_activation(summary_logit)
-
-    def calc_summary_with_counter(self, read_content, q_embed, counter_embed):
-        summary_input = tf.concat([read_content, q_embed, counter_embed], 1)
-        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Counter_Summary_Vector')
-        return self.apply_summary_activation(summary_logit)
-
-
-
-    def inference(self, q_embed, correlation_weight, value_matrix, counter):
-        ###############################################################################################################
-        # Input
-        # q_embeds           (2dim) : [ batch_size, key_memory_dim ]
-        # correlation_weight (2dim) : [ batch_size, memory_size ]
-        # value_matrix       (3dim) : [ batch_size, memory_size, value_memory_dim ]
-        # counter            (2dim) : [ batch_size, n_questions+1 ]
-
-        # Output
-        # read_content       (2dim) : [ batch_size, value_memory_dim ]
-        # summary            (2dim) : [ batch_size, summary_dim ]
-        # Probability        (2dim) : [ batch_size, 1 ]
-
-        # Intermediate
-        # counter_embeds     (2dim) : [ batch_size, counter_embed_dim ]
-        ###############################################################################################################
-
-        # read content
-        read_content = self.memory.value.read(value_matrix, correlation_weight)
-
-        # counter
-        counter_content_logit = operations.linear(tf.cast(counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
-        counter_content = tf.sigmoid(counter_content_logit)
-
-        # summary
-        summary_vector = tf.cond(self.using_counter_graph,
-                          lambda:self.calc_summary_with_counter(read_content, q_embed, counter_content),
-                          lambda:self.calc_summary(read_content, q_embed)
-                         )
-
-        '''
-        summary_input = tf.concat([read_content, q_embed, counter_content], 1)
-        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Counter_Summary_Vector')
-        summary_vector = self.apply_summary_activation(summary_logit)
-        '''
-
-        # probabiltiy for input question
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
-        pred_prob = tf.sigmoid(pred_logits)
-
-        return read_content, summary_vector, pred_logits, pred_prob
-
-    '''
-    def inference(self, q_embed, correlation_weight, value_matrix):
-        ###############################################################################################################
-        # Input
-        # q_embeds           (2dim) : [ batch_size, key_memory_dim ]
-        # correlation_weight (2dim) : [ batch_size, memory_size ]
-        # value_matrix       (3dim) : [ batch_size, memory_size, value_memory_dim ]
-
-        # Output
-        # read_content       (2dim) : [ batch_size, value_memory_dim ]
-        # summary            (2dim) : [ batch_size, summary_dim ]
-        # Probability        (2dim) : [ batch_size, 1 ]
-        ###############################################################################################################
-
-        # read content
-        read_content = self.memory.value.read(value_matrix, correlation_weight)
-
-        # summary
-        summary_input = tf.concat([read_content, q_embed], 1)
-        summary_logit = operations.linear(summary_input, self.args.final_fc_dim, name='Summary_Vector')
-        summary_vector = self.apply_summary_activation(summary_logit)
-
-        # probability
-        pred_logits = operations.linear(summary_vector, 1, name='Prediction')
-        pred_prob = tf.sigmoid(pred_logits)
-
-        return read_content, summary_vector, pred_logits, pred_prob
     '''
 
     # TODO : It should input value matrix/ counter?
@@ -329,7 +385,8 @@ class Mixin:
 
         q_constant = tf.constant(np.arange(self.args.batch_size), dtype=tf.int32)
         # TODO : add tf.cond for non-using counter case
-        prev_total_pred_probs = self.inference_average_with_counter(self.memory.memory_value, self.q_counter)
+        prev_total_pred_probs = self.total_uniform_inference(self.memory.memory_value, self.q_counter)
+
         # Logics
         for i in range(self.args.seq_len):
 
@@ -343,8 +400,10 @@ class Mixin:
 
             q_embed = self.embedding_q(q)
             qa_embed = self.embedding_qa(qa)
+            counter_embed = self.embedding_counter(self.q_counter)
 
             correlation_weight = self.memory.attention(q_embed)
+            read = self.memory.value.read(self.memory.memory_value, correlation_weight)
 
             # TODO : There was a bug 
             # mastery level 
@@ -354,16 +413,17 @@ class Mixin:
             #prev_total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter, self.using_counter_graph)
             #print(prev_total_pred_probs.shape)
                 
-            prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, self.q_counter)
+            read, summary, prob_logit, prob = self.inference(q_embed, read, counter_embed)
+            #prev_read_content, prev_summary, prev_pred_logit, prev_pred_prob = self.inference(q_embed, correlation_weight, self.memory.memory_value, self.q_counter)
 
-            prediction.append(prev_pred_logit)
+            prediction.append(prob_logit)
 
-            knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, qa_embed, prev_read_content, prev_summary, prev_pred_prob, mastery_level)
+            knowledge_growth = self.calculate_knowledge_growth(self.memory.memory_value, qa_embed, read, summary, prob, mastery_level)
             self.memory.memory_value = self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
 
             mastery_level = self.calculate_mastery_level(self.memory.memory_value)
             #total_pred_probs = self.calculate_pred_probs(self.memory.memory_value, self.q_counter, self.using_counter_graph)
-            total_pred_probs = self.inference_average_with_counter(self.memory.memory_value, self.q_counter)
+            total_pred_probs = self.total_uniform_inference(self.memory.memory_value, self.q_counter)
 
             mastery_level_list.append(mastery_level)
 
@@ -379,7 +439,7 @@ class Mixin:
             #valid_q = tf.squeeze(tf.gather(q, valid_idx))
             #print('valid_q : ' + str(valid_q))
 
-            p = tf.gather(tf.sigmoid(prev_pred_logit) , valid_idx)
+            p = tf.gather(tf.sigmoid(prob_logit) , valid_idx)
 
             probs_diff = tf.gather(total_pred_probs_diff, valid_idx)
             negative_idx = tf.where(tf.less(probs_diff, 0))
@@ -518,21 +578,10 @@ class Mixin:
 
         ##### Building other useful graphs
         # TODO : remove using_counter graph because it is member variable of model
-        self.build_total_prob_graph(self.value_matrix, self.counter, self.using_counter_graph)
+        self.total_inference(self.value_matrix, self.counter)
         self.build_mastery_graph(self.value_matrix, self.counter, self.using_counter_graph)
 
 
-    def build_total_prob_graph(self, value_matrix, counter, using_counter_graph):
-
-        total_q_data = tf.constant(tf.range(1,self.args.n_questions+1))
-        q_embeds = self.embedding_q(total_q_data)
-
-        self.total_correlation_weight = self.memory.attention(q_embeds)
-       
-        stacked_total_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
-        stacked_total_counter = tf.tile(counter, tf.stack([self.args.n_questions, 1]))
-
-        _, _, _, self.total_pred_probs = self.inference(q_embeds, self.total_correleation_wewgith, stacked_total_value_matrix, stacked_total_counter)
 
     def build_mastery_graph(self, value_matrix, counter, using_counter_graph):
 

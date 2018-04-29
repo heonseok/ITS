@@ -89,9 +89,9 @@ def setup():
     ##### Default(STATICS) hyperparameter #####
     parser.add_argument('--batch_size', type=int, default=10)
     parser.add_argument('--memory_size', type=int, default=50)
-    parser.add_argument('--memory_key_state_dim', type=int, default=50)
-    parser.add_argument('--memory_value_state_dim', type=int, default=100)
-    parser.add_argument('--final_fc_dim', type=int, default=50)
+    parser.add_argument('--key_memory_dim', type=int, default=50)
+    parser.add_argument('--value_memory_dim', type=int, default=100)
+    parser.add_argument('--summary_dim', type=int, default=50)
     parser.add_argument('--n_questions', type=int, default=1223)
     parser.add_argument('--seq_len', type=int, default=200)
 

@@ -14,10 +14,11 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
 #import _model
-import _model_merged
+#import _model_merged
 #import _model_merged_multi
+import _model_refactored
 
-class DKVMNModel(_model_merged.Mixin):
+class DKVMNModel(_model_refactored.Mixin):
     def __init__(self, args, name='KT'):
     #def __init__(self, args, sess, name='KT'):
 
