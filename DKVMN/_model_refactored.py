@@ -24,6 +24,7 @@ class Mixin:
                      init_memory_key=init_memory_key, init_memory_value=stacked_init_memory_value, args=self.args)
 
     def build_embedding_mtx(self):
+        # todo : seq_len dimension exists?
         # Embedding to [batch size, seq_len, memory_state_dim(d_k or d_v)]
         # initializer=tf.truncated_normal_initializer(stddev=0.1))
 
@@ -55,21 +56,21 @@ class Mixin:
         return summary
 
     def calc_summary(self, read, q_embed):
-        ###############################################################################################################
+        ################################################################################################################
         # Input
         # read               (2dim) : [ batch_size, value_memory_dim ]
         # q_embeds           (2dim) : [ batch_size, key_memory_dim ]
 
         # Output
         # summary            (2dim) : [ batch_size, summary_dim ]
-        ###############################################################################################################
+        ################################################################################################################
 
         summary_input = tf.concat([read, q_embed], 1)
         summary_logit = operations.linear(summary_input, self.args.summary_dim, name='Summary_Vector')
         return self.apply_summary_activation(summary_logit)
 
     def calc_summary_with_counter(self, read, q_embed, counter_embed):
-        ###############################################################################################################
+        ################################################################################################################
         # Input
         # read               (2dim) : [ batch_size, value_memory_dim ]
         # q_embeds           (2dim) : [ batch_size, key_memory_dim ]
@@ -77,19 +78,19 @@ class Mixin:
 
         # Output
         # summary            (2dim) : [ batch_size, summary_dim ]
-        ###############################################################################################################
+        ################################################################################################################
 
         summary_input = tf.concat([read, q_embed, counter_embed], 1)
         summary_logit = operations.linear(summary_input, self.args.summary_dim, name='Counter_Summary_Vector')
         return self.apply_summary_activation(summary_logit)
 
     def inference(self, q_embed, read, counter_embed):
-        ###############################################################################################################
-        # -1 dim
-        # TODO : renaming functions
-        # attention : batch_size
-        # step : n_question
-        # uniform : bach_size*n_questions
+        ################################################################################################################
+        # -1 dim means
+        # batch_attention           : batch_size
+        # skill_attention           : n_question
+        # batch_skill_uniform       : bach_size*n_questions
+        # step?                     : 1
 
         # Input should be reshaped to below form
         # q_embed            (2dim) : [ -1, key_memory_dim ]
@@ -100,7 +101,7 @@ class Mixin:
         # read               (2dim) : [ -1, value_memory_dim ]
         # summary            (2dim) : [ -1, summary_dim ]
         # Probability        (2dim) : [ -1, 1 ]
-        ###############################################################################################################
+        ################################################################################################################
 
         # reshape
         q_embed = tf.reshape(q_embed, [-1, self.args.key_memory_dim])
@@ -119,47 +120,97 @@ class Mixin:
         return read, summary, prob_logit, prob
 
     def batch_attention_inference(self, q, value_matrix, counter):
+        ################################################################################################################
+        # pre-process data for inference
 
+        # Input
+        # q                  (2dim) : [ batch_size, 1 ]
+        # value_matrix       (3dim) : [ batch_size, memory_size, value_memory_dim ]
+        # counter            (2dim) : [ batch_size, n_question+1 ]
+
+        # Output
+        # read               (2dim) : [ batch_size, value_memory_dim ]
+        # summary            (2dim) : [ batch_size, summary_dim ]
+        # Probability        (2dim) : [ batch_size, 1 ]
+        ################################################################################################################
+
+        # q
         q_embed = self.embedding_q(q)
+
+        # read
         correlation_weight = self.memory.attention(q_embed)
-
-        counter_embed = self.embedding_counter(counter)
-
         read = self.memory.value.read(value_matrix, correlation_weight)
+
+        # counter
+        counter_embed = self.embedding_counter(counter)
 
         return self.inference(q_embed, read, counter_embed)
 
     def skill_attention_inference(self, value_matrix, counter):
+        ################################################################################################################
+        # pre-process data for inference
 
-        total_q = tf.constant(tf.range(1,self.args.n_questions+1))
+        # Input
+        # value_matrix       (3dim) : [ memory_size, value_memory_dim ]
+        # counter            (2dim) : [ 1, n_question+1 ]
 
+        # Intermediate
+        # total_q            (2dim) : [ n_question, 1 ]
+
+        # Output
+        # read               (2dim) : [ n_question, value_memory_dim ]
+        # summary            (2dim) : [ n_question, summary_dim ]
+        # Probability        (2dim) : [ n_question, 1 ]
+        ################################################################################################################
+
+        # q_embed
+        total_q = tf.range(1, self.args.n_questions+1)
         q_embed = self.embedding_q(total_q)
 
+        # read
         self.total_correlation_weight = self.memory.attention(q_embed)
-
         stacked_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.n_questions, 1, 1]))
         stacked_read = self.memory.value.read(stacked_value_matrix, self.total_correlation_weight)
 
+        # counter
         counter_embed = self.embedding_counter(counter)
         stacked_counter_embed = tf.tile(counter_embed, tf.stack([self.args.n_questions, 1]))
 
         _, _, _, self.total_pred_probs = self.inference(q_embed, stacked_read, stacked_counter_embed)
 
     def batch_skill_uniform_inference(self, value_matrix, counter):
+        ################################################################################################################
+        # pre-process data for inference
 
+        # Input
+        # value_matrix          (3dim) : [ batch_size, memory_size, value_memory_dim ]
+        # counter               (2dim) : [ batch_size, n_question+1 ]
+
+        # Intermediate
+        # total_q               (2dim) : [ n_question, 1 ]
+        # stacked_q_embed       (3dim) : [ batch_size, n_question, key_memory_dim ]
+        # stacked_read          (3dim) : [ batch_size, n_question, value_memory_dim ]
+        # stacked_counter_embed (3dim) : [ batch_size, n_question, counter_embed_dim ]
+
+        # Output
+        # read                  (2dim) : [ batch_size*n_question, value_memory_dim ]
+        # summary               (2dim) : [ batch_size*n_question, summary_dim ]
+        # Probability           (2dim) : [ batch_size*n_question, 1 ]
+        ################################################################################################################
+
+        # q_embed
         total_q = tf.range(1, self.args.n_questions+1)
-
         q_embed = self.embedding_q(total_q)
+        stacked_q_embed = tf.tile(tf.expand_dims(q_embed, 0), tf.stack([self.args.batch_size, 1, 1]))
 
+        # read
         uniform_correlation_weight = tf.ones(self.args.batch_size*self.args.memory_size, tf.float32)
         uniform_correlation_weight = tf.divide(uniform_correlation_weight, self.args.memory_size)
-
         read = self.memory.value.read(value_matrix, uniform_correlation_weight)
-
-        counter_embed = self.embedding_counter(counter)
-
-        stacked_q_embed = tf.tile(tf.expand_dims(q_embed, 0), tf.stack([self.args.batch_size, 1,1]))
         stacked_read = tf.tile(tf.expand_dims(read, 1), tf.stack([1, self.args.n_questions, 1]))
+
+        # counter
+        counter_embed = self.embedding_counter(counter)
         stacked_counter_embed = tf.tile(tf.expand_dims(counter_embed, 1), tf.stack([1, self.args.n_questions, 1]))
 
         _, _, _, prob = self.inference(stacked_q_embed, stacked_read, stacked_counter_embed)
@@ -167,26 +218,41 @@ class Mixin:
         return prob
 
     # TODO : It should input value matrix/ counter?
-    def calc_mastery(self, value_matrix, counter):
-        zero_q_embed = tf.zeros(shape=[self.args.batch_size, self.args.memory_size, self.args.key_memory_dim])
-        # zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions])
+    # def calc_mastery(self, value_matrix, counter):
+    def batch_concept_attention_inference_mastery(self, value_matrix, counter):
+        ################################################################################################################
+        # pre-process data for inference
 
-        # zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
-        # zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
+        # Input
+        # value_matrix       (3dim) : [ batch_size, memory_size, value_memory_dim ]
+        # counter            (2dim) : [ batch_size, n_question+1 ]
 
+        # Intermediate
+        # zero_q_embed          (2dim) : [ n_question, 1 ]
+        # stacked_zero_q_embed  (3dim) : [ batch_size, memory_size, key_memory_dim ]
+
+        # Output
+        # mastery               (2dim) : [ batch_size, memory_size ]
+        ################################################################################################################
+
+        # q_embed
+        stacked_zero_q_embed = tf.zeros(shape=[self.args.batch_size, self.args.memory_size, self.args.key_memory_dim])
+
+        # read
         one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
-        stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
-        # stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0), tf.stack([self.args.batch_size, 1, 1]))
+        stacked_one_hot_correlation_weight = tf.tile(tf.expand_dims(one_hot_correlation_weight, 0),
+                                                     tf.stack([self.args.batch_size, 1, 1]))
         stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 1), tf.stack([1, self.args.memory_size, 1, 1]))
+        stacked_read = self.memory.value.read(stacked_mastery_value_matrix, stacked_one_hot_correlation_weight)
 
-        # read_content : batch_size memory_size memory_state_dim
-        read_content = self.memory.value.read_for_mastery(stacked_mastery_value_matrix, stacked_one_hot_correlation_weight)
-        # read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
-        # print(read_content.shape)
+        # counter
+        counter_embed = self.embedding_counter(counter)
+        stacked_counter_embed = tf.tile(tf.expand_dims(counter_embed, 1), tf.stack([1, self.args.memory_size, 1]))
 
+        '''
         # summary
-        summary_input = tf.concat([read_content, zero_q_embed], 2)
-        summary_input_reshaped = tf.reshape(summary_input, shape=[self.args.batch_size*self.args.memory_size, -1])
+        summary_input = tf.concat([read_content, stacked_zero_q_embed], 2)
+        summary_input_reshaped = tf.reshape(summary_input, shape=[self.args.batch_size*self.args.memory_size, 0])
         summary_logit = operations.linear(summary_input_reshaped, self.args.summary_dim, name='Summary_Vector')
         summary_vector = self.apply_summary_activation(summary_logit)
 
@@ -195,6 +261,41 @@ class Mixin:
         pred_logits_reshaped = tf.reshape(pred_logits, shape=[self.args.batch_size, -1])
 
         return tf.sigmoid(pred_logits_reshaped)
+        '''
+        _, _, _, mastery = self.inference(stacked_zero_q_embed, stacked_read, stacked_counter_embed)
+        return tf.reshape(mastery, [self.args.batch_size, self.args.memory_size])
+
+
+    def build_mastery_graph(self, value_matrix, counter, using_counter_graph):
+    # def skill_attention_inference_mastery(self, value_matrix, counter):
+
+        zero_q_embed = tf.zeros(shape=[self.args.memory_size, self.args.key_memory_dim])
+        #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions])
+
+        #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
+        #zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
+
+        one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
+
+        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.memory_size, 1, 1]))
+        stacked_mastery_counter = tf.tile(counter, tf.stack([self.args.memory_size, 1]))
+
+        read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
+
+        # counter
+        counter_content_logit = operations.linear(tf.cast(stacked_mastery_counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
+        counter_content = tf.sigmoid(counter_content_logit)
+
+        # summary
+        summary_input = tf.cond(using_counter_graph,
+                                lambda: tf.concat([read_content, zero_q_embed, counter_content], 1),
+                                lambda: tf.concat([read_content, zero_q_embed], 1))
+        summary_logit = operations.linear(summary_input, self.args.summary_dim, name='Counter_Summary_Vector')
+        summary = self.apply_summary_activation(summary_logit)
+
+        # mastery
+        pred_logits = operations.linear(summary, 1, name='Prediction')
+        self.concept_mastery_level = tf.sigmoid(pred_logits)
 
     '''
     def calculate_pred_probs(self, value_matrix, counter, using_counter_graph):
@@ -285,7 +386,7 @@ class Mixin:
         mastery_list = list()
 
         prev_total_uniform_prob = self.batch_skill_uniform_inference(self.memory.memory_value, self.q_counter)
-        prev_mastery = self.calc_mastery(self.memory.memory_value, self.q_counter)
+        prev_mastery = self.batch_concept_attention_inference_mastery(self.memory.memory_value, self.q_counter)
 
         mastery_list.append(prev_mastery)
 
@@ -321,7 +422,7 @@ class Mixin:
                 self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
 
             # update prev variables
-            mastery = self.calc_mastery(self.memory.memory_value, self.q_counter)
+            mastery = self.batch_concept_attention_inference_mastery(self.memory.memory_value, self.q_counter)
             mastery_list.append(mastery)
             prev_mastery = mastery
 
@@ -403,6 +504,7 @@ class Mixin:
         q_embed = self.embedding_q(q)
         correlation_weight = self.memory.attention(q_embed)
 
+        # TODO : adapt inference to other inference
         _, _, _, prob = self.inference(q_embed, correlation_weight, value_matrix)
 
         # TODO : arguemnt check for various algorithms
@@ -440,17 +542,23 @@ class Mixin:
 
         # -1 for sampling
         # 0, 1 for given answer
+
+        self.qa = q + tf.multiply(a, self.args.n_questions)
+        '''
+        # TODO : use cond for sampling 
         self.qa = tf.cond(tf.squeeze(a) < 0,
                           lambda: self.sampling_a_given_q(q, stacked_value_matrix),
                           lambda: q + tf.multiply(a, self.args.n_questions) )
+        '''
 
         a = (self.qa-1) // self.args.n_questions
         qa_embed = self.embedding_qa(self.qa)
 
         # before Step
-        read, summary, prob_logit, prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
+        # read, summary, prob_logit, prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
+        read, summary, prob_logit, prob = self.batch_attention_inference(q, stacked_value_matrix, self.counter)
         # prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
-        mastery = self.calc_mastery_level(stacked_value_matrix)
+        mastery = self.batch_concept_attention_inference_mastery(stacked_value_matrix, self.counter)
 
         # step
         knowledge_growth = self.extend_knowledge_growth(stacked_value_matrix, qa_embed, read, summary, prob, mastery)
@@ -462,32 +570,3 @@ class Mixin:
         self.skill_attention_inference(self.value_matrix, self.counter)
         self.build_mastery_graph(self.value_matrix, self.counter, self.using_counter_graph)
 
-    def build_mastery_graph(self, value_matrix, counter, using_counter_graph):
-
-        zero_q_embed = tf.zeros(shape=[self.args.memory_size, self.args.key_memory_dim])
-        #zero_q_embed = tf.zeros(shape=[self.args.memory_size,self.args.n_questions])
-
-        #zero_q_embed_content_logit = operations.linear(zero_q_embed, 50, name='input_embed_content', reuse=True)
-        #zero_q_embed_content = tf.tanh(zero_q_embed_content_logit)
-
-        one_hot_correlation_weight = tf.one_hot(np.arange(self.args.memory_size), self.args.memory_size)
-
-        stacked_mastery_value_matrix = tf.tile(tf.expand_dims(value_matrix, 0), tf.stack([self.args.memory_size, 1, 1]))
-        stacked_mastery_counter = tf.tile(counter, tf.stack([self.args.memory_size, 1]))
-
-        read_content = self.memory.value.read(stacked_mastery_value_matrix, one_hot_correlation_weight)
-
-        # counter
-        counter_content_logit = operations.linear(tf.cast(stacked_mastery_counter, tf.float32), self.args.counter_embedding_dim, name='counter_content')
-        counter_content = tf.sigmoid(counter_content_logit)
-
-        # summary
-        summary_input = tf.cond(using_counter_graph,
-                                lambda: tf.concat([read_content, zero_q_embed, counter_content], 1),
-                                lambda: tf.concat([read_content, zero_q_embed], 1))
-        summary_logit = operations.linear(summary_input, self.args.summary_dim, name='Counter_Summary_Vector')
-        summary = self.apply_summary_activation(summary_logit)
-
-        # mastery
-        pred_logits = operations.linear(summary, 1, name='Prediction')
-        self.concept_mastery_level = tf.sigmoid(pred_logits)
