@@ -96,7 +96,7 @@ for repeat_idx in range(repeat_num):
                                                     args_list.append(str(convergence_loss_weight))
 
                                                     args_list.append('--negative_influence_loss_weight')
-                                                    args_list.append(str(0.0001))
+                                                    args_list.append(str(0.01))
 
                                                     args_list.append('--knowledge_growth')
                                                     args_list.append(knowledge_growth)

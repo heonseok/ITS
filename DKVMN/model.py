@@ -1,4 +1,6 @@
 import numpy as np
+import math
+import sys
 import os, time
 import tensorflow as tf
 import operations
@@ -162,6 +164,9 @@ class DKVMNModel(_model_refactored.Mixin):
             pred_list = list()
             target_list = list()        
             epoch_loss = 0
+            epoch_ce_loss = 0
+            epoch_ni_loss = 0
+            epoch_co_loss = 0
             learning_rate = tf.train.exponential_decay(self.args.initial_lr, global_step=self.global_step, decay_steps=self.args.anneal_interval*training_step, decay_rate=0.667, staircase=True)
             lr = learning_rate.eval()
             for steps in range(training_step):
@@ -178,14 +183,31 @@ class DKVMNModel(_model_refactored.Mixin):
                 target_batch = target_batch.astype(np.float)
 
                 op = [self.loss, self.pred, self.train_op,
-                      self.cross_entropy_loss, self.negative_influence_loss, self.convergence_loss]
+                      self.cross_entropy_loss, self.negative_influence_loss, self.convergence_loss,
+                      # self.prob_debug, self.prb_diff_debug, self.negative_index_debug, self.prob_diff_negative_debug, self.sq_debug, self.mean_debug, self.cul_mean_debug
+                      ]
 
                 feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch,
                              self.lr:lr, self.selected_mastery_index:selected_mastery_index,
                              self.using_counter_graph:self.args.using_counter_graph}
 
+                # loss_, pred_, _, ce_loss, ni_loss, co_loss, \ prob_debug, prob_diff_debug, negative_index_debug, prob_diff_negative_debug, sq_debug, mean_debug, cul_mean_debug = self.sess.run(op, feed_dict=feed_dict)
                 loss_, pred_, _, ce_loss, ni_loss, co_loss = self.sess.run(op, feed_dict=feed_dict)
-                # loss_, pred_, _, = self.sess.run([self.loss, self.pred, self.train_op], feed_dict=feed_dict)
+
+                # print(prob_list.shape)
+                '''
+                print(prob_debug)
+                print(prob_diff_debug)
+                print(negative_index_debug)
+                print(prob_diff_negative_debug)
+                print(sq_debug)
+                print(mean_debug)
+                print('NI LOSS')
+                print(cul_mean_debug)
+                if math.isnan(cul_mean_debug):
+                   sys.exit()
+                '''
+
 
                 pred_ = pred_[:,selected_mastery_index+1:] 
                 target_batch = target_batch[:,selected_mastery_index+1:]
@@ -202,6 +224,9 @@ class DKVMNModel(_model_refactored.Mixin):
                 target_list.append(right_target[right_index])
 
                 epoch_loss += loss_
+                epoch_ce_loss += ce_loss
+                epoch_ni_loss += ni_loss
+                epoch_co_loss += co_loss
                 # print('Epoch %d/%d, steps %d/%d, loss : %3.5f' % (epoch+1, self.args.num_epochs, steps+1, training_step, loss_))
                 
 
@@ -213,9 +238,12 @@ class DKVMNModel(_model_refactored.Mixin):
 
 
             train_auc, train_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
-            epoch_loss = epoch_loss / training_step    
+            epoch_loss = epoch_loss / training_step
+            epoch_ce_loss = epoch_ce_loss / training_step
+            epoch_ni_loss = epoch_ni_loss / training_step
+            epoch_co_loss = epoch_co_loss / training_step
             self.logger.debug('Epoch %d/%d, loss : %3.5f, auc : %3.5f, acc : %3.5f ce: %3.5f, ni: %3.5f, co: %3.5f'
-                              % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy, ce_loss, ni_loss, co_loss))
+                              % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy, epoch_ce_loss, epoch_ni_loss, epoch_co_loss))
             # self.logger.debug('Epoch %d/%d, loss : %3.5f, auc : %3.5f, accuracy : %3.5f' % (epoch+1, self.args.num_epochs, epoch_loss, train_auc, train_accuracy))
             # self.write_log(epoch=epoch+1, auc=train_auc, accuracy=train_accuracy, loss=epoch_loss, name='training_')
 

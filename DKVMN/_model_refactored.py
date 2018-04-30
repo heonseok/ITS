@@ -380,9 +380,13 @@ class Mixin:
         # loss sum init
         convergence_loss_term = 0
         negative_influence_loss_term = 0
+        # negative_influence_loss_term = tf.get_variable('ni_loss_term', [1], dtype=tf.float32, initializer=tf.zeros_initializer, trainable=False)
 
         # for counter indexing
         q_constant = tf.constant(np.arange(self.args.batch_size), dtype=tf.int32)
+
+        # for debugging
+        # self.prob_list = []
 
         # logic
         for i in range(self.args.seq_len):
@@ -420,13 +424,33 @@ class Mixin:
             # calc losses
             # TODO : remove -1 target.
             valid_idx = tf.where(tf.not_equal(target, tf.constant(-1, dtype=tf.float32)))
+            valid_cond = tf.not_equal(target, tf.constant(-1, dtype=tf.float32))
+            total_uniform_prob_diff = tf.reshape(total_uniform_prob_diff, [self.args.batch_size, -1])
+            # print(a.shape) # (32,)
+            # print(total_uniform_prob_diff.shape) # (32, 110)
             correct_idx = tf.where(tf.equal(a, tf.constant(1, tf.float32)))
+            correct_cond = tf.equal(a, tf.constant(1, tf.float32))
+            # print(correct_idx.shape) #(?, 1)
 
             # calc negative influence loss
-            prob_diff = tf.gather(total_uniform_prob_diff, correct_idx)
-            negative_idx = tf.where(tf.less(prob_diff, 0))
+            valid_correct_idx = tf.where(tf.logical_and(valid_cond, correct_cond))
+            # prob_diff = tf.squeeze(tf.gather(total_uniform_prob_diff, valid_idx))
+            prob_diff = tf.squeeze(tf.gather(total_uniform_prob_diff, valid_correct_idx))
+            # print(prob_diff.shape) # (?, 1, 110)
+            negative_idx = tf.where(tf.less(prob_diff, tf.constant(0, tf.float32)))
+            # print(negative_idx.shape) # (?, 3)
             prob_diff_negative = tf.gather_nd(prob_diff, negative_idx)
-            negative_influence_loss_term += tf.reduce_mean(tf.square(prob_diff_negative))
+            # print(prob_diff_negative.shape) # (?, )
+            negative_influence_loss_term += tf.reduce_sum(tf.square(prob_diff_negative))
+            # print(negative_influence_loss_term.shape) # ()
+
+            self.prob_debug = total_uniform_prob_diff
+            self.prb_diff_debug = prob_diff
+            self.negative_index_debug = negative_idx
+            self.prob_diff_negative_debug = prob_diff_negative
+            self.sq_debug = tf.square(prob_diff_negative)
+            self.mean_debug = tf.reduce_sum(tf.square(prob_diff_negative))
+            self.cul_mean_debug = negative_influence_loss_term
 
             # calc convergence loss
             p = tf.gather(tf.sigmoid(prob_logit) , valid_idx)
@@ -434,7 +458,8 @@ class Mixin:
             valid_counter = tf.gather_nd(self.q_counter, q_concat)
             valid_counter = tf.squeeze(tf.gather(valid_counter, valid_idx))
             loss_term = tf.squeeze(tf.square(1-p))
-            convergence_loss_term += tf.reduce_mean(tf.cast(valid_counter, tf.float32) * loss_term)
+            convergence_loss_term += tf.reduce_sum(tf.cast(valid_counter, tf.float32) * loss_term)
+            # print(convergence_loss_term)
 
             q_one_hot = tf.one_hot(q, self.args.n_questions+1, dtype=tf.int32)
             self.q_counter += q_one_hot
@@ -463,6 +488,9 @@ class Mixin:
         self.cross_entropy_loss = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(logits=filtered_logits, labels=filtered_target))
         self.negative_influence_loss = self.args.negative_influence_loss_weight * negative_influence_loss_term
+        # print(self.args.negative_influence_loss_weight)
+        # print(negative_influence_loss_term)
+        # print(self.negative_influence_loss)
         self.convergence_loss = self.args.convergence_loss_weight * convergence_loss_term
 
         self.loss = self.cross_entropy_loss + self.negative_influence_loss + self.convergence_loss
