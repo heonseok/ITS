@@ -28,7 +28,7 @@ convergence_loss_weight_list = [0.0002]
 counter_embedding_dim_list = [64]
 
 # 0.0001, 0.001, 0.01, 0.1
-negative_influence_loss_weight_list = [0.0001]
+negative_influence_loss_weight_list = [0.0]
 
 ########################################################################################################################
 # DQN
@@ -43,9 +43,10 @@ reward_type_list = ['mastery']
 # 'dqn', 'random', 'prob_max'
 policy_type_list = ['dqn']
 
-repeat_num = 1 
+repeat_start = 1
+repeat_end = 10
 
-for repeat_idx in range(repeat_num):
+for repeat_idx in range(repeat_start, repeat_end):
 
     # DKVMN
     for knowledge_growth in knowledge_growth_list:
@@ -66,7 +67,7 @@ for repeat_idx in range(repeat_num):
                                                     args_list = []
                                                     args_list.append('python main.py')
 
-                                                    args_list.append('--prefix squre_')
+                                                    args_list.append('--prefix Uniform_')
 
                                                     args_list.append('--repeat_idx')
                                                     args_list.append(str(repeat_idx))
@@ -96,7 +97,7 @@ for repeat_idx in range(repeat_num):
                                                     args_list.append(str(convergence_loss_weight))
 
                                                     args_list.append('--negative_influence_loss_weight')
-                                                    args_list.append(str(0.01))
+                                                    args_list.append(str(negative_influence_loss_weight))
 
                                                     args_list.append('--knowledge_growth')
                                                     args_list.append(knowledge_growth)
