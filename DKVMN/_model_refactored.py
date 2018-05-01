@@ -460,7 +460,7 @@ class Mixin:
             valid_counter = tf.squeeze(tf.gather(valid_counter, valid_idx))
             loss_term = tf.squeeze(tf.square(1-p))
             # convergence_loss_term += tf.reduce_sum(tf.cast(valid_counter, tf.float32) * loss_term)
-            tf.assign_add(convergence_loss_term, tf.reduce_sum(tf.cast(valid_counter, tf.float32) * loss_term))
+            tf.assign_add(convergence_loss_term, tf.reduce_mean(tf.cast(valid_counter, tf.float32) * loss_term))
             # print(convergence_loss_term)
 
             q_one_hot = tf.one_hot(q, self.args.n_questions+1, dtype=tf.int32)
