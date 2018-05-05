@@ -125,6 +125,8 @@ class DKVMNAnalyzer():
         self.logger.info('Mastery {}, {}'.format(answer_type, right_updated_mastery_counter))
         self.logger.info('{}'.format(int2str_list(wrong_updated_mastery_list)))
 
+        return right_updated_skill_counter
+
 
     # TODO : rename it
 

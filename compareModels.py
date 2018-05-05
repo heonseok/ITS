@@ -15,13 +15,17 @@ from sklearn.metrics import accuracy_score
 
 from model import *
 from dkvmn_analysis import *
-from setup import * 
+from setup import *
 
-target_model_list = [ 
-                      # k_growth   summary    cLossW  cGraph
-                      #[ 'origin' , 'sigmoid', 0.0   , False ],
-                      [ 'summary', 'sigmoid', 0.0002, True  ],
-                      [ 'summary', 'sigmoid', 0.0   , False ],
+from utils import *
+
+logger = set_logger('mDKVMN', 'merging_dkvmn_analysis.log', 'INFO')
+logger.debug('Merging DKVMN analyzing results')
+
+target_model_list = [
+                      # k_growth, activation, counter, niLoss, cLoss
+                      ['summary', 'sigmoid', False, 0.0, 0.0],
+                      ['summary', 'sigmoid', True, 0.0, 0.0002]
                     ]
 
 args, run_config = setup()
@@ -29,31 +33,37 @@ args, run_config = setup()
 args.dkvmn_train = False
 args.dkvmn_test  = False
 
-print(args)
-
-
-print(target_model_list)
 default_batch_size = args.batch_size
 default_seq_len = args.seq_len
 
+answer_type = 1
+update_value_matrix_flag = True
+
+# RUC : right update count
 
 for model_idx, target_spec in enumerate(target_model_list):
-    print(target_spec)
+    logger.info(target_spec)
+    ruc_list = []
+
     tf.reset_default_graph()
     # TODO : importing to DKVMN model as reset_argument?
 
     args.knowledge_growth = target_spec[0]
     args.summary_activation = target_spec[1]
-    args.counter_loss_weight = target_spec[2]
-    args.using_counter_graph = target_spec[3]
+    args.using_counter_graph = target_spec[2]
+    args.negative_influence_loss_weight = target_spec[3]
+    args.convergence_loss_weight = target_spec[4]
 
-    if args.repeat_idx == 0:
-        args.batch_size = default_batch_size 
-        args.seq_len = default_seq_len 
-        print(args.batch_size)
-        print(args.seq_len)
-        dkvmn = DKVMNModel(args, name='DKVMN')
-        graph = dkvmn.build_step_dkvmn_graph()
+    for repeat_idx in range(10):
+        args.repeat_idx = repeat_idx
+
+        if args.repeat_idx == 0:
+            args.batch_size = default_batch_size
+            args.seq_len = default_seq_len
+            # print(args.batch_size)
+            # print(args.seq_len)
+            dkvmn = DKVMNModel(args, name='DKVMN')
+            graph = dkvmn.build_step_dkvmn_graph()
 
         with tf.Session(config = run_config, graph = graph) as sess:
             tf.global_variables_initializer().run()
@@ -62,4 +72,10 @@ for model_idx, target_spec in enumerate(target_model_list):
 
             aDKVMN = DKVMNAnalyzer(args, dkvmn)
 
-            aDKVMN.test()
+            # aDKVMN.test()
+            ruc = aDKVMN.test1_base(answer_type, update_value_matrix_flag)
+            ruc_list.append(ruc)
+
+    logger.info('RUC')
+    logger.info(ruc_list)
+
