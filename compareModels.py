@@ -39,11 +39,22 @@ default_seq_len = args.seq_len
 answer_type = 1
 update_value_matrix_flag = True
 
-# RUC : right update count
+
+# load test data
+data_directory = os.path.join(args.data_dir, args.dataset)
+test_data_path = os.path.join(data_directory, args.data_name + '_test.npz')
+
+test_data = np.load(test_data_path)
+test_q_data = test_data['q']
+test_qa_data = test_data['qa']
 
 for model_idx, target_spec in enumerate(target_model_list):
     logger.info(target_spec)
+
+    # RUC : right update count
     ruc_list = []
+    auc_list = []
+    acc_list = []
 
     tf.reset_default_graph()
     # TODO : importing to DKVMN model as reset_argument?
@@ -63,19 +74,32 @@ for model_idx, target_spec in enumerate(target_model_list):
             # print(args.batch_size)
             # print(args.seq_len)
             dkvmn = DKVMNModel(args, name='DKVMN')
-            graph = dkvmn.build_step_dkvmn_graph()
+            # graph = dkvmn.build_step_dkvmn_graph()
+            graph = dkvmn.build_dkvmn_graph()
 
         with tf.Session(config = run_config, graph = graph) as sess:
             tf.global_variables_initializer().run()
             dkvmn.set_session(sess)
             dkvmn.load()
 
+            _, _, auc, acc = dkvmn.test(test_q_data, test_qa_data)
+            auc_list.append(auc)
+            acc_list.append(acc)
+
+            '''
             aDKVMN = DKVMNAnalyzer(args, dkvmn)
 
             # aDKVMN.test()
             ruc = aDKVMN.test1_base(answer_type, update_value_matrix_flag)
             ruc_list.append(ruc)
+            '''
 
-    logger.info('RUC')
-    logger.info(ruc_list)
+    logger.info('AUC')
+    logger.info(auc_list)
+
+    logger.info('ACC')
+    logger.info(acc_list)
+
+    # logger.info('RUC')
+    # logger.info(ruc_list)
 
