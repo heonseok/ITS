@@ -513,7 +513,7 @@ class Mixin:
             print(i.name)
             print(i.shape)
 
-        self.saver = tf.train.Saver(max_to_keep=1000)
+        self.saver = tf.train.Saver()
 
     ####################################################################################################################
     # FOR Reinforcement Learning
