@@ -68,15 +68,21 @@ def main():
                 dkvmn.load()
                 dkvmn.test(test_q_data, test_qa_data)
 
-    if myArgs.dkvmn_analysis:
+
+    if myArgs.dkvmn_analysis or myArgs.dkvmn_clustering_actions:
         graph = dkvmn.build_step_dkvmn_graph()
         with tf.Session(config = run_config, graph = graph) as sess:
             sess.run(tf.global_variables_initializer())
-
             dkvmn.set_session(sess)
-            aDKVMN = DKVMNAnalyzer(myArgs, dkvmn)
-            dkvmn.load()
-            aDKVMN.test()
+
+            if myArgs.dkvmn_analysis:
+                aDKVMN = DKVMNAnalyzer(myArgs, dkvmn)
+                dkvmn.load()
+                aDKVMN.test()
+
+            if myArgs.dkvmn_clustering_actions:
+                dkvmn.load()
+                dkvmn.clustering_actions()
     '''
 
     # TODO : remove sess from __init__

@@ -389,7 +389,7 @@ class DKVMNModel(_model_refactored.Mixin):
         value_matrix = self.get_init_value_matrix()
         # value_matrix = self.sess.run(self.init_memory_value)
 
-        total_cor_weight = self.sess.run(self.total_correlation_weight, feed_dict={self.total_value_matrix : value_matrix})
+        total_cor_weight = self.sess.run(self.total_correlation_weight)
     
         kmeans = KMeans(n_clusters=self.args.memory_size).fit(total_cor_weight)
         # print('kmeans centers')
