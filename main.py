@@ -27,7 +27,6 @@ def main():
         test_data_path = os.path.join(data_directory, myArgs.data_name + '_test.npz')
 
         if myArgs.split_data_flag == True:
-            #print('#####SPLIT DATA#####')
             data = DATA_LOADER(myArgs, ',')
             total_q_data, total_qa_data = data.load_data(data_path)
 
@@ -37,6 +36,8 @@ def main():
             np.savez(train_data_path, q=train_q, qa=train_qa)
             np.savez(valid_data_path, q=valid_q, qa=valid_qa)
             np.savez(test_data_path, q=test_q, qa=test_qa)
+
+            print('#####SPLIT DATA FINISHED#####')
 
         train_data = np.load(train_data_path)
         train_q_data = train_data['q']
