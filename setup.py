@@ -53,7 +53,7 @@ def setup():
     parser.add_argument('--dkvmn_checkpoint_dir', type=str, default='DKVMN/checkpoint')
     parser.add_argument('--dkvmn_log_dir', type=str, default='DKVMN/log')
     parser.add_argument('--data_dir', type=str, default='DKVMN/data')
-    parser.add_argument('--data_name', type=str, default='assist2009_updated')
+    parser.add_argument('--data_name', type=str, default='STATICS')
 
     '''
     parser.add_argument('--train_postfix', type=str, default='train1')
@@ -70,7 +70,9 @@ def setup():
 
     parser.add_argument('--write_type', type=str, choices=['add_off_erase_off', 'add_off_erase_on', 'add_on_erase_off', 'add_on_erase_on'], default='add_on_erase_on')
 
-    parser.add_argument('--using_counter_graph', type=str2bool, default='t')
+    parser.add_argument('--using_concept_counter_graph', type=str2bool, default='f')
+    parser.add_argument('--using_counter_graph', type=str2bool, default='f')
+
     parser.add_argument('--counter_embedding_dim', type=int, default=64)
     parser.add_argument('--convergence_loss_weight', type=float, default=0.0)
     parser.add_argument('--negative_influence_loss_weight', type=float, default=0.0)
