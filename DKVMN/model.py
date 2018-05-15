@@ -61,6 +61,7 @@ class DKVMNModel(_model_refactored.Mixin):
         graph = tf.Graph()
         with graph.as_default():
             self.using_counter_graph = tf.placeholder(tf.bool)
+            self.using_concept_counter_graph = tf.placeholder(tf.bool)
             self.build_model()
             # if self.args.dkvmn_train != True:
                 # self.build_step_graph()
@@ -71,6 +72,7 @@ class DKVMNModel(_model_refactored.Mixin):
         graph = tf.Graph()
         with graph.as_default():
             self.using_counter_graph = tf.placeholder(tf.bool)
+            self.using_concept_counter_graph = tf.placeholder(tf.bool)
             self.build_model()
             self.args.batch_size = 1
             self.args.batch_size = 1
@@ -79,30 +81,43 @@ class DKVMNModel(_model_refactored.Mixin):
         return graph
 
     def get_init_counter(self):
-        return np.zeros([1,self.args.n_questions+1])  
+        return np.zeros([1, self.args.n_questions+1])
+
+    def get_init_concept_counter(self):
+        return np.zeros([1, self.args.memory_size])
 
     def get_init_value_matrix(self):
         return self.sess.run(self.init_memory_value)
 
-    def get_prediction_probability(self, value_matrix, counter):
-        feed_dict = {self.value_matrix: value_matrix, self.counter: counter,
-                     self.using_counter_graph: self.args.using_counter_graph}
+    def get_prediction_probability(self, value_matrix, counter, concept_counter):
+        feed_dict = {self.value_matrix: value_matrix, self.counter: counter, self.concept_counter: concept_counter,
+                     self.using_counter_graph: self.args.using_counter_graph,
+                     self.using_concept_counter_graph: self.args.using_concept_counter_graph }
         return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict=feed_dict))
 
-    def get_mastery_level(self, value_matrix, counter):
-        feed_dict = {self.value_matrix: value_matrix, self.counter: counter,
-                     self.using_counter_graph: self.args.using_counter_graph}
+    def get_mastery_level(self, value_matrix, counter, concept_counter):
+        feed_dict = {self.value_matrix: value_matrix, self.counter: counter, self.concept_counter: concept_counter,
+                     self.using_counter_graph: self.args.using_counter_graph,
+                     self.using_concept_counter_graph: self.args.using_concept_counter_graph }
         return np.squeeze(self.sess.run(self.concept_mastery, feed_dict=feed_dict))
 
-    def update_value_matrix(self, value_matrix, action, answer, counter):
+    def update_value_matrix(self, value_matrix, action, answer, counter, concept_counter):
         ops = [self.stepped_value_matrix]
-        feed_dict = {self.q: action, self.a: answer, self.value_matrix: value_matrix, self.counter: counter,
-                     self.using_counter_graph: self.args.using_counter_graph}
+        feed_dict = {self.q: action, self.a: answer, self.value_matrix: value_matrix,
+                     self.counter: counter, self.concept_counter: concept_counter,
+                     self.using_counter_graph: self.args.using_counter_graph,
+                     self.using_concept_counter_graph: self.args.using_concept_counter_graph }
         value_matrix = self.sess.run(ops, feed_dict=feed_dict)
         return np.squeeze(value_matrix)
 
     def expand_dims(self, val):
         return np.expand_dims(np.expand_dims(val, axis=0), axis=0)
+
+    def increase_concept_counter(self, concept_counter, q):
+        # q = self.expand_dims(q)
+        q_embed, cor_weight = self.sess.run([self.q_embed, self.cor_weight], feed_dict={self.q: q})
+
+        return concept_counter + cor_weight
 
     def train(self, train_q_data, train_qa_data, valid_q_data, valid_qa_data, early_stop=False,
               checkpoint_dir='', selected_mastery_index=-1):
@@ -189,7 +204,8 @@ class DKVMNModel(_model_refactored.Mixin):
 
                 feed_dict = {self.q_data_seq:q_batch_seq, self.qa_data_seq:qa_batch_seq, self.target_seq:target_batch,
                              self.lr:lr, self.selected_mastery_index:selected_mastery_index,
-                             self.using_counter_graph:self.args.using_counter_graph}
+                             self.using_counter_graph:self.args.using_counter_graph,
+                             self.using_concept_counter_graph:self.args.using_concept_counter_graph}
 
                 # loss_, pred_, _, ce_loss, ni_loss, co_loss, \ prob_debug, prob_diff_debug, negative_index_debug, prob_diff_negative_debug, sq_debug, mean_debug, cul_mean_debug = self.sess.run(op, feed_dict=feed_dict)
                 loss_, pred_, _, ce_loss, ni_loss, co_loss = self.sess.run(op, feed_dict=feed_dict)
@@ -257,7 +273,10 @@ class DKVMNModel(_model_refactored.Mixin):
                 # right : 1, wrong : 0, padding : -1
                 valid_target = (valid_qa - 1) // self.args.n_questions
                 valid_target = valid_target.astype(np.float)
-                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target, self.selected_mastery_index:selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
+                valid_feed_dict = {self.q_data_seq : valid_q, self.qa_data_seq : valid_qa, self.target_seq : valid_target,
+                                   self.selected_mastery_index: selected_mastery_index,
+                                   self.using_counter_graph: self.args.using_counter_graph,
+                                   self.using_concept_counter_graph: self.args.using_concept_counter_graph }
                 valid_loss, valid_pred = self.sess.run([self.loss, self.pred], feed_dict=valid_feed_dict)
                 # Same with training set
 
@@ -328,7 +347,11 @@ class DKVMNModel(_model_refactored.Mixin):
             # meta graph version
             # feed_dict = {"q_data_seq:0":test_q_batch, "qa_data:0":test_qa_batch, "target:0":target_batch, "selected_mastery_index:0":selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
 
-            feed_dict = {self.q_data_seq:test_q_batch, self.qa_data_seq:test_qa_batch, self.target_seq:target_batch, self.selected_mastery_index:selected_mastery_index, self.using_counter_graph:self.args.using_counter_graph}
+            feed_dict = {self.q_data_seq: test_q_batch, self.qa_data_seq: test_qa_batch, self.target_seq: target_batch,
+                         self.selected_mastery_index: selected_mastery_index,
+                         self.using_counter_graph: self.args.using_counter_graph,
+                         self.using_concept_counter_graph: self.args.using_concept_counter_graph
+                         }
             loss_, pred_ = self.sess.run([self.loss, self.pred], feed_dict=feed_dict)
             # Get right answer index
             # Make [batch size * seq_len, 1]
@@ -484,13 +507,17 @@ class DKVMNModel(_model_refactored.Mixin):
             format(self.args.knowledge_growth, self.args.summary_activation, self.args.memory_size)
 
         counter_spec = '_Counter_{}_cDim_{}'.format(self.args.using_counter_graph, self.args.counter_embedding_dim)
+        if self.args.using_concept_counter_graph == False:
+            concept_counter_spec = ''
+        else:
+            concept_counter_spec = '_ConCounter_{}'.format(self.args.using_concept_counter_graph)
 
         ni_weight_spec = '_niLoss_{}'.format(self.args.negative_influence_loss_weight)
         co_weight_spec = '_coLoss_{}'.format(self.args.convergence_loss_weight)
 
         repeat_spec = '_rIdx_{}'.format(self.args.repeat_idx)
 
-        return network_spec + counter_spec + ni_weight_spec + co_weight_spec + repeat_spec
+        return network_spec + counter_spec + concept_counter_spec + ni_weight_spec + co_weight_spec + repeat_spec
         # return network_spec + network_detail + counter_detail + ni_weight_detail + dataset_detail + repeat_detail
 
     def load(self, checkpoint_dir=''):
@@ -511,7 +538,10 @@ class DKVMNModel(_model_refactored.Mixin):
             self.new_saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
             '''
 
+            # '''
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+            # '''
+
             self.logger.debug('DKVMN ckpt loaded')
             return True
         else:

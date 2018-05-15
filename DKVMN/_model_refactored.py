@@ -84,7 +84,22 @@ class Mixin:
         summary_logit = operations.linear(summary_input, self.args.summary_dim, name='Counter_Summary_Vector')
         return self.apply_summary_activation(summary_logit)
 
-    def inference(self, q_embed, read, counter_embed):
+    def calc_summary_with_concept_counter(self, read, q_embed, concept_counter):
+        ################################################################################################################
+        # Input
+        # read               (2dim) : [ batch_size, value_memory_dim ]
+        # q_embeds           (2dim) : [ batch_size, key_memory_dim ]
+        # concept_counter    (2dim) : [ batch_size, memory_size ]
+
+        # Output
+        # summary            (2dim) : [ batch_size, summary_dim ]
+        ################################################################################################################
+
+        summary_input = tf.concat([read, q_embed, concept_counter], 1)
+        summary_logit = operations.linear(summary_input, self.args.summary_dim, name='Concept_Counter_Summary_Vector')
+        return self.apply_summary_activation(summary_logit)
+
+    def inference(self, q_embed, read, counter_embed, concept_counter):
         ################################################################################################################
         # -1 dim means
         # batch_attention           : batch_size
@@ -107,11 +122,18 @@ class Mixin:
         q_embed = tf.reshape(q_embed, [-1, self.args.key_memory_dim])
         read = tf.reshape(read, [-1, self.args.value_memory_dim])
         counter_embed = tf.reshape(counter_embed, [-1, self.args.counter_embedding_dim])
+        concept_counter = tf.reshape(concept_counter, [-1, self.args.memory_size])
 
         # summary
         summary = tf.cond(self.using_counter_graph,
                           lambda: self.calc_summary_with_counter(read, q_embed, counter_embed),
                           lambda: self.calc_summary(read, q_embed) )
+
+        if self.args.using_concept_counter_graph == True:
+            summary  = tf.cond(self.using_concept_counter_graph,
+                               lambda: self.calc_summary_with_concept_counter(read, q_embed, concept_counter),
+                               lambda: summary
+                               )
 
         # probability for input question
         prob_logit = operations.linear(summary, 1, name='Prediction')
@@ -119,7 +141,7 @@ class Mixin:
 
         return read, summary, prob_logit, prob
 
-    def batch_attention_inference(self, q, value_matrix, counter):
+    def batch_attention_inference(self, q, value_matrix, counter, concept_counter):
         ################################################################################################################
         # pre-process data for inference
 
@@ -144,9 +166,9 @@ class Mixin:
         # counter_embed
         counter_embed = self.embedding_counter(counter)
 
-        return self.inference(q_embed, read, counter_embed)
+        return self.inference(q_embed, read, counter_embed, concept_counter)
 
-    def skill_attention_inference(self, value_matrix, counter):
+    def skill_attention_inference(self, value_matrix, counter, concept_counter):
         ################################################################################################################
         # pre-process data for inference
 
@@ -176,12 +198,13 @@ class Mixin:
         counter_embed = self.embedding_counter(counter)
         stacked_counter_embed = tf.tile(counter_embed, tf.stack([self.args.n_questions, 1]))
 
-        _, _, _, prob = self.inference(q_embed, stacked_read, stacked_counter_embed)
+        stacked_concept_counter =  tf.tile(concept_counter, tf.stack([self.args.n_questions, 1]))
+        _, _, _, prob = self.inference(q_embed, stacked_read, stacked_counter_embed, stacked_concept_counter)
         # _, _, _, self.total_pred_probs = self.inference(q_embed, stacked_read, stacked_counter_embed)
 
         return prob
 
-    def batch_skill_uniform_inference(self, value_matrix, counter):
+    def batch_skill_uniform_inference(self, value_matrix, counter, concept_counter):
         ################################################################################################################
         # pre-process data for inference
 
@@ -216,11 +239,13 @@ class Mixin:
         counter_embed = self.embedding_counter(counter)
         stacked_counter_embed = tf.tile(tf.expand_dims(counter_embed, 1), tf.stack([1, self.args.n_questions, 1]))
 
-        _, _, _, prob = self.inference(stacked_q_embed, stacked_read, stacked_counter_embed)
+        stacked_concept_counter =  tf.tile(tf.expand_dims(concept_counter, 1), tf.stack([1, self.args.n_questions, 1]))
+
+        _, _, _, prob = self.inference(stacked_q_embed, stacked_read, stacked_counter_embed, stacked_concept_counter)
 
         return prob
 
-    def concept_attention_inference_mastery(self, value_matrix, counter):
+    def concept_attention_inference_mastery(self, value_matrix, counter, concept_counter):
     # def build_mastery_graph(self, value_matrix, counter):
         ################################################################################################################
         # pre-process data for inference mastery
@@ -248,10 +273,11 @@ class Mixin:
         counter_embed = self.embedding_counter(counter)
         stacked_counter_embed = tf.tile(counter_embed, tf.stack([self.args.memory_size, 1]))
 
-        _, _, _, prob = self.inference(zero_q_embed, read, stacked_counter_embed)
+        stacked_concept_counter = tf.tile(concept_counter, tf.stack([self.args.memory_size, 1]))
+        _, _, _, prob = self.inference(zero_q_embed, read, stacked_counter_embed, stacked_concept_counter)
         return prob
 
-    def batch_concept_attention_inference_mastery(self, value_matrix, counter):
+    def batch_concept_attention_inference_mastery(self, value_matrix, counter, concept_counter):
         ################################################################################################################
         # pre-process data for inference mastery
 
@@ -281,7 +307,9 @@ class Mixin:
         counter_embed = self.embedding_counter(counter)
         stacked_counter_embed = tf.tile(tf.expand_dims(counter_embed, 1), tf.stack([1, self.args.memory_size, 1]))
 
-        _, _, _, mastery = self.inference(stacked_zero_q_embed, stacked_read, stacked_counter_embed)
+        stacked_concept_counter = tf.tile(tf.expand_dims(concept_counter, 1), tf.stack([1, self.args.memory_size, 1]))
+
+        _, _, _, mastery = self.inference(stacked_zero_q_embed, stacked_read, stacked_counter_embed, stacked_concept_counter)
         return tf.reshape(mastery, [self.args.batch_size, self.args.memory_size])
 
     '''
@@ -361,6 +389,14 @@ class Mixin:
                                          [self.args.batch_size, self.args.n_questions+1], dtype=tf.int32,
                                          initializer=tf.zeros_initializer, trainable=False)
 
+        if self.args.using_concept_counter_graph == True:
+            q_concept_counter = tf.get_variable('self.concept_counter',
+                                             [self.args.batch_size, self.args.memory_size], dtype=tf.float32,
+                                             initializer=tf.zeros_initializer, trainable=False)
+            self.q_concept_counter = q_concept_counter
+        else:
+            q_concept_counter = tf.zeros([self.args.batch_size, self.args.memory_size], dtype=tf.float32)
+
         # TODO : move to __init__
         self.memory = self.build_memory()
         self.build_embedding_mtx()
@@ -372,8 +408,8 @@ class Mixin:
         prediction = list()
         mastery_list = list()
 
-        prev_total_uniform_prob = self.batch_skill_uniform_inference(self.memory.memory_value, self.q_counter)
-        prev_mastery = self.batch_concept_attention_inference_mastery(self.memory.memory_value, self.q_counter)
+        prev_total_uniform_prob = self.batch_skill_uniform_inference(self.memory.memory_value, self.q_counter, q_concept_counter)
+        prev_mastery = self.batch_concept_attention_inference_mastery(self.memory.memory_value, self.q_counter, q_concept_counter)
 
         mastery_list.append(prev_mastery)
 
@@ -402,7 +438,7 @@ class Mixin:
             correlation_weight = self.memory.attention(q_embed)
 
             # read
-            read, summary, prob_logit, prob = self.batch_attention_inference(q, self.memory.memory_value, self.q_counter)
+            read, summary, prob_logit, prob = self.batch_attention_inference(q, self.memory.memory_value, self.q_counter, q_concept_counter)
             prediction.append(prob_logit)
 
             # write
@@ -413,11 +449,11 @@ class Mixin:
                 self.memory.value.write_given_a(self.memory.memory_value, correlation_weight, knowledge_growth, a)
 
             # update prev variables
-            mastery = self.batch_concept_attention_inference_mastery(self.memory.memory_value, self.q_counter)
+            mastery = self.batch_concept_attention_inference_mastery(self.memory.memory_value, self.q_counter, q_concept_counter)
             mastery_list.append(mastery)
             prev_mastery = mastery
 
-            total_uniform_prob = self.batch_skill_uniform_inference(self.memory.memory_value, self.q_counter)
+            total_uniform_prob = self.batch_skill_uniform_inference(self.memory.memory_value, self.q_counter, q_concept_counter)
             total_uniform_prob_diff = total_uniform_prob - prev_total_uniform_prob
             prev_total_uniform_prob = total_uniform_prob
 
@@ -466,6 +502,9 @@ class Mixin:
             q_one_hot = tf.one_hot(q, self.args.n_questions+1, dtype=tf.int32)
             # self.q_counter += q_one_hot
             tf.assign_add(self.q_counter, q_one_hot)
+            q_concept_counter = q_concept_counter + correlation_weight
+
+
 
         self.mastery_level_seq = mastery_list
         # self.prediction_seq = tf.sigmoid(prediction)
@@ -543,6 +582,7 @@ class Mixin:
                                            name='step_value_matrix')
 
         self.counter = tf.placeholder(tf.int32, [1, self.args.n_questions+1], name='step_counter')
+        self.concept_counter = tf.placeholder(tf.float32, [1, self.args.memory_size], name='step_concept_counter')
 
         #slice_a = tf.split(self.a, self.args.seq_len, 1)
         #a = tf.squeeze(slice_a[0], 1)
@@ -553,8 +593,9 @@ class Mixin:
         #q = tf.squeeze(self.q)
         q = tf.squeeze(self.q, 1)
         #q = self.q
-        q_embed = self.embedding_q(q)
-        correlation_weight = self.memory.attention(q_embed)
+        self.q_embed = self.embedding_q(q)
+        correlation_weight = self.memory.attention(self.q_embed)
+        self.cor_weight = correlation_weight
 
         stacked_value_matrix = tf.tile(tf.expand_dims(self.value_matrix, 0), tf.stack([1, 1, 1]))
         #stacked_value_matrix = tf.tile(tf.expand_dims(self.value_matrix, 0), tf.stack([self.args.batch_size, 1, 1]))
@@ -575,9 +616,9 @@ class Mixin:
 
         # before Step
         # read, summary, prob_logit, prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
-        read, summary, prob_logit, prob = self.batch_attention_inference(q, stacked_value_matrix, self.counter)
+        read, summary, prob_logit, prob = self.batch_attention_inference(q, stacked_value_matrix, self.counter, self.concept_counter)
         # prev_read_content, prev_summary, prev_pred_logits, prev_pred_prob = self.inference(q_embed, correlation_weight, stacked_value_matrix, self.counter)
-        mastery = self.batch_concept_attention_inference_mastery(stacked_value_matrix, self.counter)
+        mastery = self.batch_concept_attention_inference_mastery(stacked_value_matrix, self.counter, self.concept_counter)
 
         # step
         knowledge_growth = self.extend_knowledge_growth(stacked_value_matrix, qa_embed, read, summary, prob, mastery)
@@ -586,6 +627,6 @@ class Mixin:
 
         # build other useful graphs
         # TODO : remove using_counter graph because it is member variable of model
-        self.total_pred_probs = self.skill_attention_inference(self.value_matrix, self.counter)
-        self.concept_mastery = self.concept_attention_inference_mastery(self.value_matrix, self.counter)
+        self.total_pred_probs = self.skill_attention_inference(self.value_matrix, self.counter, self.concept_counter)
+        self.concept_mastery = self.concept_attention_inference_mastery(self.value_matrix, self.counter, self.concept_counter)
 

@@ -65,7 +65,7 @@ def set_logger(name, path, logging_level):
 
 ######### utility ############
 def float2str_list(input_list):
-    return ','.join('{:4f}'.format(item) for item in input_list)
+    return ','.join('{:.4f}'.format(item) for item in input_list)
 
 def int2str_list(input_list):
     return ','.join('{}'.format(item) for item in input_list)
