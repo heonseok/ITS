@@ -134,13 +134,13 @@ class DKVMNAnalyzer():
         # Adaptive knowledge growth test
 
         self.logger.info('Converge Speed Test')
-        target_q = 0
+        target_q = 25 
 
         init_counter = self.dkvmn.get_init_counter()
         init_concept_counter = self.dkvmn.get_init_concept_counter()
         init_value_matrix = self.dkvmn.get_init_value_matrix()
 
-        prob_diff_th = 0.001
+        prob_diff_th = 0.01
         repeat_lim = 100
 
         repeat_count = np.zeros(self.num_actions)
@@ -182,31 +182,37 @@ class DKVMNAnalyzer():
         # test for latent learning by repeating the same exercises
         self.logger.info('Latent Information Test')
 
-        list1 = self.test_latent_learning_base(answer_type, 0)
-        list2 = self.test_latent_learning_base(answer_type, 10)
-        list3 = self.test_latent_learning_base(answer_type, 20)
+        list0 = self.test_latent_learning_base(answer_type, 0)
+        list1 = self.test_latent_learning_base(answer_type, 10)
+        list2 = self.test_latent_learning_base(answer_type, 20)
+        list3 = self.test_latent_learning_base(answer_type, 30)
+        list4 = self.test_latent_learning_base(answer_type, 40)
+        list5 = self.test_latent_learning_base(answer_type, 50)
 
-        return [list1, list2, list3]
+        return [list0, list1, list2, list3, list4, list5]
 
     def test_latent_learning_base(self, answer_type, no_response_period):
-        repeat_num = 30
+        repeat_num = 100
         init_counter = self.dkvmn.get_init_counter()
         init_concept_counter = self.dkvmn.get_init_concept_counter()
         init_value_matrix = self.dkvmn.get_init_value_matrix()
         init_probs = self.dkvmn.get_prediction_probability(init_value_matrix, init_counter, init_concept_counter)
 
         prob_mat = np.zeros((self.num_actions, repeat_num+1))
+
         for action_idx in range(self.num_actions):
             value_matrix = np.copy(init_value_matrix)
             counter = np.copy(init_counter)
             concept_counter = np.copy(init_concept_counter)
 
             prob_mat[action_idx][0] = init_probs[action_idx]
+            for non_response_idx in range(no_response_period):
+                counter[0][action_idx] += 1
+                action = self.dkvmn.expand_dims(action_idx+1)
+                concept_counter = self.dkvmn.increase_concept_counter(concept_counter, action)
+
             for repeat_idx in range(repeat_num):
-                if repeat_idx < no_response_period:
-                    update_value_matrix_flag = False
-                else:
-                    update_value_matrix_flag = True
+                update_value_matrix_flag = True
 
                 value_matrix, counter, concept_counter, probs, mastery, _, _ = self.calc_influence(action_idx, answer_type, value_matrix, counter, concept_counter, update_value_matrix_flag)
                 prob_mat[action_idx][repeat_idx+1] = probs[action_idx]
