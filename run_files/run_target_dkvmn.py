@@ -5,7 +5,7 @@ import os
 ########################################################################################################################
 
 # 'origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'
-knowledge_growth_list = ['summary']
+knowledge_growth_list = ['origin']
 
 # 'sigmoid', 'tanh', 'relu'
 summary_activation_list = ['sigmoid']
@@ -23,12 +23,13 @@ write_type_list = ['add_on_erase_on']
 learning_rate_list = [0.6]
 
 # 0.0, 0.001, 0.01, 0.1, 1.0
-convergence_loss_weight_list = [0.0002]
+convergence_loss_weight_list = [0.0]
 
 counter_embedding_dim_list = [64]
 
 # 0.0001, 0.001, 0.01, 0.1
-negative_influence_loss_weight_list = [0.0]
+negative_influence_loss_weight_list = [0.0001, 0.001]
+# negative_influence_loss_weight_list = [0.0001, 0.001, 0.01, 0.1]
 
 ########################################################################################################################
 # DQN
@@ -43,8 +44,8 @@ reward_type_list = ['mastery']
 # 'dqn', 'random', 'prob_max'
 policy_type_list = ['dqn']
 
-repeat_start = 1
-repeat_end = 10
+repeat_start = 5 
+repeat_end = 6 
 
 for repeat_idx in range(repeat_start, repeat_end):
 
@@ -67,19 +68,22 @@ for repeat_idx in range(repeat_start, repeat_end):
                                                     args_list = []
                                                     args_list.append('python main.py')
 
-                                                    args_list.append('--prefix Uniform_')
+                                                    args_list.append('--prefix aaai_statics_')
+                                                    # args_list.append('--prefix aaai_assist2015_')
 
                                                     args_list.append('--repeat_idx')
                                                     args_list.append(str(repeat_idx))
 
-                                                    args_list.append('--dataset assist2009_updated')
+                                                    # args_list.append('--dataset assist2009_updated')
+                                                    args_list.append('--dataset STATICS')
                                                     # args_list.append('--dataset synthetic')
+                                                    # args_list.append('--dataset assist2015')
 
                                                     ####################################################################
                                                     # control
                                                     ####################################################################
                                                     args_list.append('--dkvmn_train t --dkvmn_test t')
-                                                    args_list.append('--dkvmn_analysis t')
+                                                    args_list.append('--dkvmn_analysis f')
                                                     args_list.append('--dkvmn_ideal_test f')
                                                     args_list.append('--dkvmn_clustering_actions f')
 
@@ -88,7 +92,8 @@ for repeat_idx in range(repeat_start, repeat_end):
                                                     ####################################################################
                                                     # DKVMN
                                                     ####################################################################
-                                                    args_list.append('--using_counter_graph t')
+                                                    args_list.append('--using_counter_graph f')
+                                                    args_list.append('--using_concept_counter_graph f')
 
                                                     args_list.append('--counter_embedding_dim')
                                                     args_list.append(str(counter_embedding_dim))

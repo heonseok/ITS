@@ -24,10 +24,11 @@ logger.debug('Merging DKVMN analyzing results')
 
 target_model_list = [
                       # k_growth, activation, counter, concept_counter, niLoss
-                        ['origin', 'tanh', False, False, 0.0 ],
-                        ['origin', 'sigmoid', False, False, 0.0 ],
-                        ['summary', 'sigmoid', False, False, 0.0],
-                        ['origin', 'sigmoid', True, False, 0.0]
+                        # ['origin', 'tanh', False, False, 0.0 ],
+                        # ['origin', 'sigmoid', False, False, 0.0 ],
+                        # ['summary', 'sigmoid', False, False, 0.0],
+                        ['origin', 'sigmoid', False, True, 0.1]
+                        # ['origin', 'sigmoid', True, False, 0.0]
                     ]
 
 args, run_config = setup()
