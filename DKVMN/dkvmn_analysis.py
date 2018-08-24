@@ -45,7 +45,42 @@ class DKVMNAnalyzer():
             wrong_response_count_prob = np.sum(probs_diff > 0)
             wrong_response_count_mastery = np.sum(mastery_diff > 0)
 
+        ########### calculate probability decrease statistic
+        prob_pos_update = probs_diff[probs_diff >= 0]
+        prob_neg_update = probs_diff[probs_diff <0] 
+
+        target_prev_prob = prev_probs[action_idx] 
+        target_prob_diff = probs_diff[action_idx]
+        target_prob      = probs[action_idx]
+
+        stat_summary_total = self.get_stats(probs_diff)
+        stat_summary_pos = self.get_stats(prob_pos_update) 
+        stat_summary_neg = self.get_stats(prob_neg_update)
+
+        print(",".join([str(action_idx), str(target_prev_prob), str(target_prob), str(target_prob_diff), stat_summary_total, stat_summary_pos, stat_summary_neg]))
+
         return value_matrix, counter, concept_counter, probs, mastery_level, wrong_response_count_prob, wrong_response_count_mastery
+
+    def get_stats(self, arr):
+        if len(arr) == 0: 
+            return "0,-1,-1,-1,-1"
+
+        arr_stat = list()
+        arr_stat.append(len(arr))
+        arr_stat.append(np.min(arr))
+        arr_stat.append(np.max(arr))
+        arr_stat.append(np.average(arr))
+        arr_stat.append(np.std(arr))  
+
+        '''
+        arr_min = np.min(arr)
+        arr_max = np.max(arr)
+        arr_avg = np.average(arr)
+        arr_std = np.std(arr)  
+        '''
+        stat_summary = ['{:.4f}'.format(x) for x in arr_stat]
+        return ",".join(stat_summary)
+         
 
     def test(self):
         self.logger.info('#'*120)
@@ -53,6 +88,7 @@ class DKVMNAnalyzer():
 
         self.test_negative_influence(True)
 
+        '''
         self.test_converge_bound(True)
 
         self.test_converge_speed(1, True)
@@ -60,6 +96,7 @@ class DKVMNAnalyzer():
         self.test_latent_learning(1)
 
         self.test_latent_learning2(1)
+        '''
         
     def test_negative_influence(self, update_value_matrix_flag):
         self.logger.info('Negative Influence Test')
@@ -77,6 +114,14 @@ class DKVMNAnalyzer():
         right_updated_mastery_counter = 0
         wrong_updated_mastery_list = []
 
+        '''
+        # Scenario : answer all problem correctly 
+        value_matrix = init_value_matrix
+        counter = init_counter
+        concept_counter = init_concept_counter
+        for idx in range(self.num_actions):
+            value_matrix, counter, concept_counter, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(idx, answer_type, value_matrix, counter, concept_counter, 1)
+        '''
         for action_idx in range(self.num_actions):
             _, _, _, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
 
@@ -90,7 +135,7 @@ class DKVMNAnalyzer():
             elif wrong_response_count_mastery > 0:
                 wrong_updated_mastery_list.append(action_idx+1)
 
-        self.logger.info('Probs   {}, {}'.format(answer_type, right_updated_skill_counter))
+        self.logger.info('Answer type: {}, CUC: {}'.format(answer_type, right_updated_skill_counter))
         self.logger.info('{}'.format(int2str_list(wrong_updated_skill_list)))
 
         # self.logger.info('Mastery {}, {}'.format(answer_type, right_updated_mastery_counter))
