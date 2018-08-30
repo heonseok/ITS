@@ -5,10 +5,10 @@ import os
 ########################################################################################################################
 
 # 'origin', 'value_matrix', 'read_content', 'summary', 'pred_prob', 'mastery'
-knowledge_growth_list = ['origin']
+knowledge_growth_list = ['summary']
 
 # 'sigmoid', 'tanh', 'relu'
-summary_activation_list = ['sigmoid']
+summary_activation_list = ['tanh']
 
 # 'sigmoid', 'tanh', 'relu'
 add_activation_list = ['tanh']
@@ -45,7 +45,7 @@ reward_type_list = ['mastery']
 policy_type_list = ['dqn']
 
 repeat_start = 0 
-repeat_end = 1 
+repeat_end = 10
 
 for repeat_idx in range(repeat_start, repeat_end):
 
@@ -68,7 +68,7 @@ for repeat_idx in range(repeat_start, repeat_end):
                                                     args_list = []
                                                     args_list.append('python main.py')
 
-                                                    args_list.append('--prefix aaai_synthetic_')
+                                                    args_list.append('--prefix aaai_anal_synthetic_')
                                                     # args_list.append('--prefix aaai_assist2015_')
 
                                                     args_list.append('--repeat_idx')

@@ -57,7 +57,7 @@ class DKVMNAnalyzer():
         stat_summary_pos = self.get_stats(prob_pos_update) 
         stat_summary_neg = self.get_stats(prob_neg_update)
 
-        # print(",".join([str(action_idx), str(target_prev_prob), str(target_prob), str(target_prob_diff), stat_summary_total, stat_summary_pos, stat_summary_neg]))
+        print(",".join([str(action_idx), str(target_prev_prob), str(target_prob), str(target_prob_diff), stat_summary_total, stat_summary_pos, stat_summary_neg]))
 
         return value_matrix, counter, concept_counter, probs, mastery_level, wrong_response_count_prob, wrong_response_count_mastery
 
@@ -114,6 +114,10 @@ class DKVMNAnalyzer():
         right_updated_mastery_counter = 0
         wrong_updated_mastery_list = []
 
+        # NEW metric
+        right_updated_skill_count_list = []
+
+
         '''
         # Scenario : answer all problem correctly 
         value_matrix = init_value_matrix
@@ -125,6 +129,8 @@ class DKVMNAnalyzer():
         for action_idx in range(self.num_actions):
             _, _, _, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
 
+            right_updated_skill_count_list.append(self.num_actions - wrong_response_count_prob)
+
             if wrong_response_count_prob == 0:
                 right_updated_skill_counter += 1
             elif wrong_response_count_prob > 0:
@@ -135,7 +141,8 @@ class DKVMNAnalyzer():
             elif wrong_response_count_mastery > 0:
                 wrong_updated_mastery_list.append(action_idx+1)
 
-        self.logger.info('Answer type: {}, CUC: {}'.format(answer_type, right_updated_skill_counter))
+        pi = np.average(right_updated_skill_count_list)/self.num_actions
+        self.logger.info('Answer type: {}, CUC: {}, PI: {}'.format(answer_type, right_updated_skill_counter, pi))
         # self.logger.info('{}'.format(int2str_list(wrong_updated_skill_list)))
 
         # self.logger.info('Mastery {}, {}'.format(answer_type, right_updated_mastery_counter))
