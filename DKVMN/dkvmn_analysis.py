@@ -57,7 +57,7 @@ class DKVMNAnalyzer():
         stat_summary_pos = self.get_stats(prob_pos_update) 
         stat_summary_neg = self.get_stats(prob_neg_update)
 
-        print(",".join([str(action_idx), str(target_prev_prob), str(target_prob), str(target_prob_diff), stat_summary_total, stat_summary_pos, stat_summary_neg]))
+        # print(",".join([str(action_idx), str(target_prev_prob), str(target_prob), str(target_prob_diff), stat_summary_total, stat_summary_pos, stat_summary_neg]))
 
         return value_matrix, counter, concept_counter, probs, mastery_level, wrong_response_count_prob, wrong_response_count_mastery
 
@@ -86,7 +86,10 @@ class DKVMNAnalyzer():
         self.logger.info('#'*120)
         self.logger.info(self.dkvmn.model_dir)
 
-        self.test_negative_influence(True)
+        self.logger.info('Prbs Avg Test')
+        self.test_probs_avg_base(1,True)
+
+        # self.test_negative_influence(True)
 
         '''
         self.test_converge_bound(True)
@@ -102,6 +105,50 @@ class DKVMNAnalyzer():
         self.logger.info('Negative Influence Test')
         return self.test_negative_influence_base(1, update_value_matrix_flag)
         # self.test_negative_influence(0, update_value_matrix_flag)
+
+    def test_probs_avg_base(self, answer_type, update_value_matrix_flag):
+        init_value_matrix = self.dkvmn.get_init_value_matrix()
+        init_counter = self.dkvmn.get_init_counter()
+        init_concept_counter = self.dkvmn.get_init_concept_counter()
+        init_probs = self.dkvmn.get_prediction_probability(init_value_matrix, init_counter, init_concept_counter)
+        init_probs_avg = np.average(init_probs)
+
+
+        value_matrix = init_value_matrix
+        probs_avg_list = list()
+        probs_avg_list.append(init_probs_avg)
+        for action_idx in range(self.num_actions):
+            value_matrix, _, _, probs, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
+
+            probs_avg_list.append(np.average(probs))
+
+        probs_avg_list = ['{:.4f}'.format(x) for x in probs_avg_list]
+        self.logger.info("ascending," + ",".join(probs_avg_list))
+
+        value_matrix = init_value_matrix
+        probs_avg_list = list()
+        probs_avg_list.append(init_probs_avg)
+        for action_idx in range(self.num_actions-1,-1,-1):
+            value_matrix, _, _, probs, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
+
+            probs_avg_list.append(np.average(probs))
+
+        probs_avg_list = ['{:.4f}'.format(x) for x in probs_avg_list]
+        self.logger.info("Descending," + ",".join(probs_avg_list))
+
+        # rand_idx = [15, 24, 34, 26, 44, 37, 38, 21, 13, 31, 48, 28, 20, 29, 32, 4, 14, 42, 27, 47, 11, 9, 49, 16, 23, 6, 8, 17, 0, 18, 43, 19, 25, 12, 39, 41, 40, 7, 3, 45, 33, 10, 36, 46, 2, 35, 5, 1, 22, 30]
+        rand_idx = np.random.permutation(self.num_actions)
+        value_matrix = init_value_matrix
+        probs_avg_list = list()
+        probs_avg_list.append(init_probs_avg)
+        for action_idx in rand_idx:
+            value_matrix, _, _, probs, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
+
+            probs_avg_list.append(np.average(probs))
+
+        probs_avg_list = ['{:.4f}'.format(x) for x in probs_avg_list]
+        self.logger.info("Permu," + ",".join(probs_avg_list))
+
 
     def test_negative_influence_base(self, answer_type, update_value_matrix_flag):
         init_value_matrix = self.dkvmn.get_init_value_matrix()
@@ -126,10 +173,16 @@ class DKVMNAnalyzer():
         for idx in range(self.num_actions):
             value_matrix, counter, concept_counter, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(idx, answer_type, value_matrix, counter, concept_counter, 1)
         '''
+
+        value_matrix = init_value_matrix
+        probs_avg_list = list()
         for action_idx in range(self.num_actions):
-            _, _, _, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
+            value_matrix, _, _, probs, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
+            # _, _, _, _, _, wrong_response_count_prob, wrong_response_count_mastery  = self.calc_influence(action_idx, answer_type, init_value_matrix, init_counter, init_concept_counter, update_value_matrix_flag)
 
             right_updated_skill_count_list.append(self.num_actions - wrong_response_count_prob)
+
+            probs_avg_list.append(np.average(probs))
 
             if wrong_response_count_prob == 0:
                 right_updated_skill_counter += 1
@@ -140,6 +193,9 @@ class DKVMNAnalyzer():
                 right_updated_mastery_counter += 1
             elif wrong_response_count_mastery > 0:
                 wrong_updated_mastery_list.append(action_idx+1)
+
+        probs_avg_list = ['{:.4f}'.format(x) for x in probs_avg_list]
+        self.logger.info(",".join(probs_avg_list))
 
         pi = np.average(right_updated_skill_count_list)/self.num_actions
         self.logger.info('Answer type: {}, CUC: {}, PI: {}'.format(answer_type, right_updated_skill_counter, pi))
