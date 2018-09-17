@@ -83,10 +83,10 @@ class DKVMNAnalyzer():
          
 
     def test(self):
-        self.logger.info('#'*120)
-        self.logger.info(self.dkvmn.model_dir)
+        # self.logger.info('#'*120)
+        # self.logger.info(self.dkvmn.model_dir)
 
-        self.logger.info('Prbs Avg Test')
+        # self.logger.info('Prbs Avg Test')
         self.test_probs_avg_base(1,True)
 
         # self.test_negative_influence(True)
@@ -123,7 +123,7 @@ class DKVMNAnalyzer():
             probs_avg_list.append(np.average(probs))
 
         probs_avg_list = ['{:.4f}'.format(x) for x in probs_avg_list]
-        self.logger.info("ascending," + ",".join(probs_avg_list))
+        self.logger.info(self.dkvmn.model_dir+",ascending," + ",".join(probs_avg_list))
 
         value_matrix = init_value_matrix
         probs_avg_list = list()
@@ -134,7 +134,7 @@ class DKVMNAnalyzer():
             probs_avg_list.append(np.average(probs))
 
         probs_avg_list = ['{:.4f}'.format(x) for x in probs_avg_list]
-        self.logger.info("Descending," + ",".join(probs_avg_list))
+        self.logger.info(self.dkvmn.model_dir+",Descending," + ",".join(probs_avg_list))
 
         # rand_idx = [15, 24, 34, 26, 44, 37, 38, 21, 13, 31, 48, 28, 20, 29, 32, 4, 14, 42, 27, 47, 11, 9, 49, 16, 23, 6, 8, 17, 0, 18, 43, 19, 25, 12, 39, 41, 40, 7, 3, 45, 33, 10, 36, 46, 2, 35, 5, 1, 22, 30]
         rand_idx = np.random.permutation(self.num_actions)
@@ -147,7 +147,7 @@ class DKVMNAnalyzer():
             probs_avg_list.append(np.average(probs))
 
         probs_avg_list = ['{:.4f}'.format(x) for x in probs_avg_list]
-        self.logger.info("Permu," + ",".join(probs_avg_list))
+        self.logger.info(self.dkvmn.model_dir+",Permu," + ",".join(probs_avg_list))
 
 
     def test_negative_influence_base(self, answer_type, update_value_matrix_flag):
