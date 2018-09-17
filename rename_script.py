@@ -2,7 +2,8 @@ import numpy as np
 import os, sys
 
 # mypath = 'synthetic'
-mypath = 'assist2009_updated'
+mypath = 'DKVMN/checkpoint/'
+mypath = mypath + 'assist2009_updated'
 
 from os import listdir
 from os.path import isfile, join
