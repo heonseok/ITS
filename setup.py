@@ -38,7 +38,7 @@ def setup():
     parser.add_argument('--split_data_flag', type=str2bool, default='f')
 
     ########## DKVMN ##########
-    parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS'], default='assist2009_updated')
+    parser.add_argument('--dataset', type=str, choices=['synthetic', 'assist2009_updated','assist2015','STATICS','naver_music'], default='assist2009_updated')
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--init_from', type=str2bool, default='f')
     parser.add_argument('--show', type=str2bool, default='f')
@@ -165,6 +165,16 @@ def setup():
         myArgs.seq_len = 200
         myArgs.data_name = 'assist2015'
         myArgs.episode_maxstep = myArgs.n_questions * 10
+
+    elif myArgs.dataset == 'naver_music':
+        myArgs.batch_size = 8 
+        myArgs.memory_size = 50 
+        myArgs.memory_key_state_dim = 10
+        myArgs.memory_value_state_dim = 10
+        myArgs.final_fc_dim = 50
+        myArgs.n_questions = 11487 
+        myArgs.seq_len = 50
+        myArgs.data_name = 'isb'
 
     if myArgs.test_policy_type != 'dqn':
         myArgs.dqn_train = False 
