@@ -503,21 +503,22 @@ class DKVMNModel(_model_refactored.Mixin):
             ni_weight_spec = '_niLoss_{}'.format(self.args.negative_influence_loss_weight)
         '''
 
-        network_spec = 'Knowledge_{}_Summary_{}_MemSize{}'.\
-            format(self.args.knowledge_growth, self.args.summary_activation, self.args.memory_size)
+        network_spec = 'Knowledge_{}'.format(self.args.knowledge_growth)
 
-        counter_spec = '_Counter_{}_cDim_{}'.format(self.args.using_counter_graph, self.args.counter_embedding_dim)
-        if self.args.using_concept_counter_graph == False:
-            concept_counter_spec = ''
-        else:
-            concept_counter_spec = '_ConCounter_{}'.format(self.args.using_concept_counter_graph)
+        # counter_spec = '_Counter_{}_cDim_{}'.format(self.args.using_counter_graph, self.args.counter_embedding_dim)
+        # if self.args.using_concept_counter_graph == False:
+        #     concept_counter_spec = ''
+        # else:
+        #     concept_counter_spec = '_ConCounter_{}'.format(self.args.using_concept_counter_graph)
 
         ni_weight_spec = '_niLoss_{}'.format(self.args.negative_influence_loss_weight)
-        co_weight_spec = '_coLoss_{}'.format(self.args.convergence_loss_weight)
+        # co_weight_spec = '_coLoss_{}'.format(self.args.convergence_loss_weight)
 
         repeat_spec = '_rIdx_{}'.format(self.args.repeat_idx)
 
-        return network_spec + counter_spec + concept_counter_spec + ni_weight_spec + co_weight_spec + repeat_spec
+        model_spec = 'knowledge_{}_niLoss_{}_rIdx_{}'.format(self.args.knowledge_growth, self.args.negative_influence_loss_weight, self.args.repeat_idx)
+        return model_spec
+        # return network_spec + counter_spec + concept_counter_spec + ni_weight_spec + co_weight_spec + repeat_spec
         # return network_spec + network_detail + counter_detail + ni_weight_detail + dataset_detail + repeat_detail
 
     def load(self, checkpoint_dir=''):
