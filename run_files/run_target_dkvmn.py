@@ -8,7 +8,7 @@ import os
 knowledge_growth_list = ['origin']
 
 # 'sigmoid', 'tanh', 'relu'
-summary_activation_list = ['sigmoid']
+summary_activation_list = ['tanh']
 
 # 'sigmoid', 'tanh', 'relu'
 add_activation_list = ['tanh']
@@ -28,7 +28,7 @@ convergence_loss_weight_list = [0.0]
 counter_embedding_dim_list = [64]
 
 # 0.0001, 0.001, 0.01, 0.1
-negative_influence_loss_weight_list = [2.5, 3.0, 3.5]
+negative_influence_loss_weight_list = [0.0]
 # negative_influence_loss_weight_list = [0.0001, 0.001, 0.01, 0.1]
 
 ########################################################################################################################
@@ -45,7 +45,7 @@ reward_type_list = ['mastery']
 policy_type_list = ['dqn']
 
 repeat_start = 0 
-repeat_end = 1 
+repeat_end = 3 
 
 for repeat_idx in range(repeat_start, repeat_end):
 
@@ -68,7 +68,7 @@ for repeat_idx in range(repeat_start, repeat_end):
                                                     args_list = []
                                                     args_list.append('python main.py')
 
-                                                    args_list.append('--prefix aaai_synthetic_')
+                                                    args_list.append('--prefix synthetic_')
                                                     # args_list.append('--prefix aaai_assist2015_')
 
                                                     args_list.append('--repeat_idx')
@@ -78,11 +78,12 @@ for repeat_idx in range(repeat_start, repeat_end):
                                                     # args_list.append('--dataset STATICS')
                                                     args_list.append('--dataset synthetic')
                                                     # args_list.append('--dataset assist2015')
+                                                    # args_list.append('--dataset naver_music')
 
                                                     ####################################################################
                                                     # control
                                                     ####################################################################
-                                                    args_list.append('--dkvmn_train t --dkvmn_test t')
+                                                    args_list.append('--dkvmn_train f --dkvmn_test f')
                                                     args_list.append('--dkvmn_analysis t')
                                                     args_list.append('--dkvmn_ideal_test f')
                                                     args_list.append('--dkvmn_clustering_actions f')

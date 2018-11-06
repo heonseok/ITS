@@ -70,7 +70,7 @@ def main():
                 dkvmn.test(test_q_data, test_qa_data)
 
 
-    if myArgs.dkvmn_analysis or myArgs.dkvmn_clustering_actions:
+    if myArgs.dkvmn_analysis or myArgs.dkvmn_clustering_actions or myArgs.policy_test:
         graph = dkvmn.build_step_dkvmn_graph()
         with tf.Session(config = run_config, graph = graph) as sess:
             sess.run(tf.global_variables_initializer())
@@ -84,6 +84,11 @@ def main():
             if myArgs.dkvmn_clustering_actions:
                 dkvmn.load()
                 dkvmn.clustering_actions()
+
+            if myArgs.policy_test:
+                myAgent = DKVMNAgent(myArgs, sess, dkvmn)
+                dkvmn.load()
+                myAgent.play()
     '''
 
     # TODO : remove sess from __init__
@@ -121,7 +126,7 @@ def main():
             dkvmn.ideal_test()
         
         ##### DQN #####
-        if myArgs.dqn_train or myArgs.dqn_test:
+        if myArgs.dqn_train or myArgs.policy_test:
             sess.run(tf.global_variables_initializer()) 
       
             #myArgs.batch_size = 1
@@ -134,7 +139,7 @@ def main():
                 os.system("rm train.csv")
             myAgent.train()
 
-        if myArgs.dqn_test:
+        if myArgs.policy_test:
             myAgent.play()
     '''
 

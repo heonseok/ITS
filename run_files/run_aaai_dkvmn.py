@@ -19,9 +19,12 @@ dataset_list = [
     # 'STATICS',
 ]
 
-train_flag = 'f' 
-test_flag = 'f'
+dkvmn_train_flag = 'f' 
+dkvmn_test_flag = 'f'
 analysis_flag = 't'
+
+policy_train_flag = 'f'
+policy_test_flag = 't'
 
 for dataset in dataset_list:
     for learning_rate in learning_rate_list:
@@ -32,11 +35,13 @@ for dataset in dataset_list:
                     args_list = []
                     args_list.append('python main.py')
 
-                    # args_list.append('--prefix synthetic_')
+                    args_list.append('--prefix hwang_')
 
-                    args_list.append('--dkvmn_train ' + train_flag)
-                    args_list.append('--dkvmn_test ' + test_flag)
+                    args_list.append('--dkvmn_train ' + dkvmn_train_flag)
+                    args_list.append('--dkvmn_test ' + dkvmn_test_flag)
                     args_list.append('--dkvmn_analysis ' + analysis_flag)
+
+                    args_list.append('--policy_test_flag ' + policy_test_flag)
 
                     args_list.append('--dataset ' + dataset)
                     args_list.append('--knowledge_growth ' + knowledge_growth)

@@ -21,7 +21,7 @@ def setup():
     parser.add_argument('--dkvmn_analysis', type=str2bool, default='f')
 
     parser.add_argument('--dqn_train', type=str2bool, default='f')
-    parser.add_argument('--dqn_test', type=str2bool, default='f')
+    parser.add_argument('--plicy_test', type=str2bool, default='f')
 
     parser.add_argument('--using_cpu', type=str2bool, default='f')
     parser.add_argument('--gpu_id', type=str, default='0')
