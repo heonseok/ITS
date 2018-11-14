@@ -89,19 +89,19 @@ class DKVMNModel(_model_refactored.Mixin):
     def get_init_value_matrix(self):
         return self.sess.run(self.init_memory_value)
 
-    def get_prediction_probability(self, value_matrix, counter, concept_counter):
+    def get_prediction_probability(self, value_matrix, counter, concept_counter=None):
         feed_dict = {self.value_matrix: value_matrix, self.counter: counter, self.concept_counter: concept_counter,
                      self.using_counter_graph: self.args.using_counter_graph,
                      self.using_concept_counter_graph: self.args.using_concept_counter_graph }
         return np.squeeze(self.sess.run(self.total_pred_probs, feed_dict=feed_dict))
 
-    def get_mastery_level(self, value_matrix, counter, concept_counter):
+    def get_mastery_level(self, value_matrix, counter, concept_counter=None):
         feed_dict = {self.value_matrix: value_matrix, self.counter: counter, self.concept_counter: concept_counter,
                      self.using_counter_graph: self.args.using_counter_graph,
                      self.using_concept_counter_graph: self.args.using_concept_counter_graph }
         return np.squeeze(self.sess.run(self.concept_mastery, feed_dict=feed_dict))
 
-    def update_value_matrix(self, value_matrix, action, answer, counter, concept_counter):
+    def update_value_matrix(self, value_matrix, action, answer, counter, concept_counter=None):
         ops = [self.stepped_value_matrix]
         feed_dict = {self.q: action, self.a: answer, self.value_matrix: value_matrix,
                      self.counter: counter, self.concept_counter: concept_counter,

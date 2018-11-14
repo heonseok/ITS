@@ -19,14 +19,19 @@ def setup():
 
     parser.add_argument('--dkvmn_clustering_actions', type=str2bool, default='f')
     parser.add_argument('--dkvmn_analysis', type=str2bool, default='f')
-
+    
     parser.add_argument('--dqn_train', type=str2bool, default='f')
-    parser.add_argument('--plicy_test', type=str2bool, default='f')
+    parser.add_argument('--policy_test', type=str2bool, default='f')
 
     parser.add_argument('--using_cpu', type=str2bool, default='f')
     parser.add_argument('--gpu_id', type=str, default='0')
 
     parser.add_argument('--repeat_idx', type=int, default=0)
+
+    ########## Scenario ########
+    # parser.add_argument('--scenario', type=str, chocies=['max_prob', 'None'], default='max_prob') 
+    # parser.add_argument('--sampling', type=str, chocies=['deterministic', 'stochastic'], default='deterministic')
+    #parser.add_argument('')
 
     ########## Data preprocessing #########
     parser.add_argument('--remove_infrequent_skill', type=str2bool, default='f')

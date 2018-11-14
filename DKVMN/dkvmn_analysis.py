@@ -1,4 +1,5 @@
 import numpy as np
+import os 
 
 from utils import *
 from model import *
@@ -7,12 +8,33 @@ class DKVMNAnalyzer():
     def __init__(self, args, dkvmn):
 
         self.args = args
-        self.dkvmn = dkvmn
         self.num_actions = self.args.n_questions
 
-        self.logger = set_logger('aDKVMN', self.args.prefix + 'dkvmn_analysis.log', self.args.logging_level)
-        self.logger.debug('Initializing DKVMN Analyzer')
+        self.dkvmn = dkvmn
 
+        self.init_value_matrix = self.dkvmn.get_init_value_matrix()
+        self.init_counter = self.dkvmn.get_init_counter()
+        self.init_concept_counter = self.dkvmn.get_init_concept_counter()
+        self.init_probs = self.dkvmn.get_prediction_probability(self.init_value_matrix, self.init_counter, self.init_concept_counter)
+        self.init_probs_avg = np.average(self.init_probs)
+
+        self.init_state()
+
+        ## hyper parameters 
+        self.max_cycle_num = 10
+
+        ## Set loggers
+        self.path = os.path.join(self.args.prefix, self.dkvmn.model_dir) 
+
+
+    def init_state(self):
+        self.value_matrix = self.init_value_matrix
+
+
+    def update_state(self, action_idx, answer_type):
+        return self.calc_influence(action_idx, answer_type, self.value_matrix, self.init_counter, self.init_concept_counter, update_value_matrix_flag=True)
+
+        
     def calc_influence(self, action_idx, answer_type, _value_matrix, _counter, _concept_counter, update_value_matrix_flag=True):
 
         value_matrix = np.copy(_value_matrix)
@@ -81,6 +103,66 @@ class DKVMNAnalyzer():
         stat_summary = ['{:.4f}'.format(x) for x in arr_stat]
         return ",".join(stat_summary)
          
+    def analysis(self):
+        self.test_response()
+        self.test_naive_policy()
+
+    def test_naive_policy(self):
+        pass
+        # self.logger.info('Naive policy test')
+
+        ## max_prob
+         
+        ## random  
+
+    # todo : measure function implementation
+    def test_response(self):
+        ## avg_probs
+        self.test_probs_avg()
+
+        ## convergence bound
+        # todo : logging path in other file
+        # self.init_state()
+
+        ## convergence speed 
+        # self.init_state()
+    
+    def test_probs_avg(self, ordering = 'permutation', answer_type=1):
+        self.init_state()
+        log_path = os.path.join(self.path, ordering)
+
+        self.logger = set_logger('aDKVMN', log_path, 'summary.log', 'INFO')
+        self.logger_avg_prob = set_logger('aDKVMN_avg_prob', log_path, 'avg_prob.log', self.args.logging_level, display=False)
+
+        self.logger_dist = set_logger('aDKVMN_dist', log_path, 'dist.log', self.args.logging_level, display=False)
+        self.logger_dist.info(float2str_list(self.init_probs))
+
+        permutation_fixed = np.random.permutation(self.num_actions)
+                    
+        probs_avg_list = list()
+        probs_avg_list.append(self.init_probs_avg)
+
+        for cycle_idx in range(self.max_cycle_num):
+
+            if ordering == 'ascending':
+                ordering_list = range(self.num_actions)
+            elif ordering == 'descending':
+                ordering_list = range(self.num_actions-1,-1,-1)
+            elif ordering == 'permutation':
+                ordering_list = np.random.permutation(self.num_actions)
+            elif ordering == 'permutation_fixed':
+                ordering_list = permutation_fixed
+            
+            for action_idx in ordering_list:
+                self.value_matrix, _, _, probs, _, wrong_response_count_prob, wrong_response_count_mastery  = self.update_state(action_idx, answer_type) 
+                probs_avg_list.append(np.average(probs))
+
+                if action_idx == self.num_actions-1:
+                    self.logger_dist.info(float2str_list(probs))
+
+        self.logger_avg_prob.info(float2str_list(probs_avg_list))
+        
+        
 
     def test(self):
         # self.logger.info('#'*120)

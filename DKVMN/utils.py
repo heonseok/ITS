@@ -36,7 +36,7 @@ def calculate_auc_acc(target, pred):
     return auc, acc 
 
 ########## LOGGER ##########
-def set_logger(name, path, logging_level):
+def set_logger(name, path, log_file, logging_level, display=True):
     logger = logging.getLogger(name)
 
     if logger.hasHandlers():
@@ -45,17 +45,19 @@ def set_logger(name, path, logging_level):
     streamFormatter = logging.Formatter('[%(levelname)s] %(message)s')
     streamHandler = logging.StreamHandler()
     streamHandler.setFormatter(streamFormatter)
-    streamHandler.setLevel(logging.DEBUG)
+    streamHandler.setLevel(logging.INFO)
 
-    if not os.path.exists('log'):
-        os.mkdir('log')
+    if not os.path.exists('log/'+path):
+        os.makedirs('log/'+path)
 
     fileFormatter = logging.Formatter('%(message)s')
-    fileHandler = logging.FileHandler(os.path.join('log',path))
+    fileHandler = logging.FileHandler(os.path.join('log', path, log_file))
     fileHandler.setFormatter(fileFormatter)
-    fileHandler.setLevel(logging.INFO)
+    fileHandler.setLevel(logging.DEBUG)
 
-    logger.addHandler(streamHandler)
+    if display == True:
+        logger.addHandler(streamHandler)
+
     logger.addHandler(fileHandler)
 
     logger.setLevel(eval('logging.{}'.format(logging_level)))
