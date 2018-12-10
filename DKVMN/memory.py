@@ -73,7 +73,7 @@ class DKVMN_Memory():
         read_content = tf.reshape(rc, [-1,self.memory_size,self.memory_state_dim])
         # Summation through memory size axis, make it [batch size, memory state dim(d_v)]
         #read_content = tf.log(tf.reduce_sum(read_content, axis=1, keep_dims=False))
-        read_content = tf.reduce_sum(read_content, axis=1, keep_dims=False)
+        read_content = tf.reduce_sum(read_content, axis=1, keepdims=False)
         #print('Read content shape : %s' % (read_content.get_shape()))
         return read_content
 

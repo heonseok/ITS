@@ -35,6 +35,24 @@ def calculate_auc_acc(target, pred):
 
     return auc, acc 
 
+
+def calculate_metric_for_each_q(target, pred, q, num_q):
+    count = list()
+    result = list()
+
+    for q_idx in range(num_q):
+
+        filtered_idx = (q == q_idx+1)
+        count.append(np.sum(filtered_idx))
+        filtered_target = target[filtered_idx]
+        filtered_pred = pred[filtered_idx]
+        sub_result = calculate_metric(filtered_target, filtered_pred)
+
+        result.append(sub_result)
+
+    return count, result
+
+
 ########## LOGGER ##########
 def set_logger(name, path, log_file, logging_level, display=True):
     logger = logging.getLogger(name)

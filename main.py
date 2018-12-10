@@ -7,7 +7,7 @@ sys.path.append('DQN')
 
 from agent import *
 from model import *
-from clusteredDKVMN import *
+# from clusteredDKVMN import *
 from dkvmn_analysis import *
 from data_loader import *
 
@@ -17,7 +17,7 @@ from setup import *
 def main():
     myArgs, run_config = setup()
 
-    if myArgs.dkvmn_train or myArgs.dkvmn_test or myArgs.dkvmn_clustering_actions or myArgs.clustered_dkvmn_train or myArgs.clustered_dkvmn_test or myArgs.dkvmn_ideal_test: 
+    if myArgs.dkvmn_analysis or myArgs.dkvmn_train or myArgs.dkvmn_test or myArgs.dkvmn_clustering_actions or myArgs.clustered_dkvmn_train or myArgs.clustered_dkvmn_test or myArgs.dkvmn_ideal_test:
         ### Split data 
         data_directory = os.path.join(myArgs.data_dir, myArgs.dataset)
         data_path = os.path.join(data_directory, myArgs.data_name + '_data.csv')
@@ -80,7 +80,7 @@ def main():
             if myArgs.dkvmn_analysis:
                 aDKVMN = DKVMNAnalyzer(myArgs, dkvmn)
                 dkvmn.load()
-                aDKVMN.analysis()
+                aDKVMN.analysis(test_q_data, test_qa_data)
 
             if myArgs.dkvmn_clustering_actions:
                 dkvmn.load()

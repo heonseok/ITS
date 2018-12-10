@@ -7,7 +7,7 @@ import operations
 import shutil
 from memory import DKVMN
 
-import dkvmn_utils
+from utils import *
 
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
@@ -25,7 +25,7 @@ class DKVMNModel(_model_refactored.Mixin):
         self.name = name
 
         # tf.set_random_seed(224)
-        self.logger = dkvmn_utils.set_logger('DKVMN', self.args.prefix + 'dkvmn.log', self.args.logging_level)
+        self.logger = set_logger('DKVMN', self.args.prefix, '_dkvmn.log', self.args.logging_level)
         self.model_name = 'DKVMN'
 
         # tf.reset_default_graph()
@@ -140,9 +140,9 @@ class DKVMNModel(_model_refactored.Mixin):
             print(np.sum(i.eval()))
         '''
         
-        if self.args.show:
-            from dkvmn_utils import ProgressBar
-            bar = ProgressBar(label, max=training_step)
+        # if self.args.show:
+        #     from dkvmn_utils import ProgressBar
+        #     bar = ProgressBar(label, max=training_step)
 
         self.train_count = 0
         # if self.args.init_from:
@@ -253,7 +253,7 @@ class DKVMNModel(_model_refactored.Mixin):
             all_target = np.concatenate(target_list, axis=0)
 
 
-            train_auc, train_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
+            train_auc, train_accuracy = calculate_auc_acc(all_target, all_pred)
             epoch_loss = epoch_loss / training_step
             epoch_ce_loss = epoch_ce_loss / training_step
             epoch_ni_loss = epoch_ni_loss / training_step
@@ -292,7 +292,7 @@ class DKVMNModel(_model_refactored.Mixin):
             all_valid_pred = np.concatenate(valid_pred_list, axis=0)
             all_valid_target = np.concatenate(valid_target_list, axis=0)
 
-            valid_auc, valid_accuracy = dkvmn_utils.calculate_metric(all_valid_target, all_valid_pred)
+            valid_auc, valid_accuracy = calculate_auc_acc(all_valid_target, all_valid_pred)
             self.logger.debug('Epoch %d/%d, valid auc : %3.5f, valid accuracy : %3.5f' %(epoch+1, self.args.num_epochs, valid_auc, valid_accuracy))
             # Valid log
             # self.write_log(epoch=epoch+1, auc=valid_auc, accuracy=valid_accuracy, loss=valid_loss, name='valid_')
@@ -383,12 +383,17 @@ class DKVMNModel(_model_refactored.Mixin):
             q_list.append(right_q)
             
             
-
         all_pred = np.concatenate(pred_list, axis=0)
         all_target = np.concatenate(target_list, axis=0)
-        # all_q = np.concatenate(q_list, axis=0)
+        all_q = np.concatenate(q_list, axis=0)
 
-        test_auc, test_accuracy = dkvmn_utils.calculate_metric(all_target, all_pred)
+        print(self.args.prefix, self.model_dir)
+        result_logger = set_logger('tDKVMN', os.path.join(self.args.prefix, self.model_dir), 'test_result.log', 'INFO', display=False)
+        result_logger.info(int2str_list(np.squeeze(all_q)))
+        result_logger.info(float2str_list(np.squeeze(all_pred)))
+        result_logger.info(float2str_list(np.squeeze(all_target)))
+
+        test_auc, test_accuracy = calculate_auc_acc(all_target, all_pred)
         # count, metric_for_each_q = dkvmn_dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)
         # print(metric_for_each_q)
         '''
@@ -396,7 +401,7 @@ class DKVMNModel(_model_refactored.Mixin):
             self.logger.info('{:<3d}: {:>7d}, {: .4f}, {: .4f}'.format(idx+1, count[idx], metric[0], metric[1]))
         '''
 
-        self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
+        # self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
         # self.write_log(epoch=1, auc=test_auc, accuracy=test_accuracy, loss=0, name='test_')
 
         return pred_list_2d, target_list_2d, test_auc, test_accuracy
