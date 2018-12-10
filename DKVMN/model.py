@@ -25,7 +25,7 @@ class DKVMNModel(_model_refactored.Mixin):
         self.name = name
 
         # tf.set_random_seed(224)
-        self.logger = set_logger('DKVMN', self.args.prefix, '_dkvmn.log', self.args.logging_level)
+        self.logger = CustomLogger('DKVMN', self.args.prefix, '_dkvmn.log', self.args.logging_level)
         self.model_name = 'DKVMN'
 
         # tf.reset_default_graph()
@@ -381,17 +381,16 @@ class DKVMNModel(_model_refactored.Mixin):
             pred_list.append(right_pred)
             target_list.append(right_target)
             q_list.append(right_q)
-            
-            
+
         all_pred = np.concatenate(pred_list, axis=0)
         all_target = np.concatenate(target_list, axis=0)
         all_q = np.concatenate(q_list, axis=0)
 
         print(self.args.prefix, self.model_dir)
-        result_logger = set_logger('tDKVMN', os.path.join(self.args.prefix, self.model_dir), 'test_result.log', 'INFO', display=False)
+        result_logger = CustomLogger('tDKVMN', os.path.join(self.args.prefix, self.model_dir), 'testset', 'INFO', display_flag=False)
         result_logger.info(int2str_list(np.squeeze(all_q)))
         result_logger.info(float2str_list(np.squeeze(all_pred)))
-        result_logger.info(float2str_list(np.squeeze(all_target)))
+        result_logger.info(int2str_list(np.squeeze(all_target)))
 
         test_auc, test_accuracy = calculate_auc_acc(all_target, all_pred)
         # count, metric_for_each_q = dkvmn_dkvmn_utils.calculate_metric_for_each_q(all_target, all_pred, all_q, self.args.n_questions)

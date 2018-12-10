@@ -1,11 +1,14 @@
 import numpy as np
-import os 
+import os
 
-from utils import *
-from model import *
-from scenario import *
+import utils
+import scenario
+import time
 
-class DKVMNAnalyzer():
+os.environ['TZ'] = 'Asia/Seoul'
+
+
+class DKVMNAnalyzer:
     def __init__(self, args, dkvmn):
 
         self.args = args
@@ -14,33 +17,25 @@ class DKVMNAnalyzer():
         self.dkvmn = dkvmn
 
         self.init_value_matrix = self.dkvmn.get_init_value_matrix()
-        self.init_counter = self.dkvmn.get_init_counter()
-        self.init_concept_counter = self.dkvmn.get_init_concept_counter()
-        self.init_probs = self.dkvmn.get_prediction_probability(self.init_value_matrix, self.init_counter, self.init_concept_counter)
-        self.init_probs_avg = np.average(self.init_probs)
-
-        self.init_state()
-
-        ## hyper parameters 
-        self.max_cycle_num = 1
-
-        ## Set loggers
-        self.path = os.path.join(self.args.prefix, self.dkvmn.model_dir)
-
-
-
-    def init_state(self):
         self.value_matrix = self.init_value_matrix
 
+        self.init_counter = self.dkvmn.get_init_counter()
+        self.init_concept_counter = self.dkvmn.get_init_concept_counter()
+        self.init_probs = self.get_probability(self.init_value_matrix)
+        self.init_probs_avg = np.average(self.init_probs)
+
+        self.max_cycle_num = 1
+        self.path = os.path.join(self.args.prefix, self.dkvmn.model_dir)
 
     def update_state(self, action_idx, answer_type):
-        return self.calc_influence(action_idx, answer_type, self.value_matrix, self.init_counter, self.init_concept_counter, update_value_matrix_flag=True)
-
+        return self.calc_influence(action_idx, answer_type, self.value_matrix,
+                                   self.init_counter, self.init_concept_counter, update_value_matrix_flag=True)
 
     def get_probability(self, value_matrix):
         return self.dkvmn.get_prediction_probability(value_matrix, self.init_counter, self.init_concept_counter)
 
-    def calc_influence(self, action_idx, answer_type, _value_matrix, _counter, _concept_counter, update_value_matrix_flag=True):
+    def calc_influence(self, action_idx, answer_type, _value_matrix,
+                       _counter, _concept_counter, update_value_matrix_flag=True):
 
         value_matrix = np.copy(_value_matrix)
         counter = np.copy(_counter)
@@ -52,7 +47,7 @@ class DKVMNAnalyzer():
         prev_mastery_level = self.dkvmn.get_mastery_level(value_matrix, counter, concept_counter)
         action = self.dkvmn.expand_dims(action_idx+1)
 
-        if update_value_matrix_flag == True:
+        if update_value_matrix_flag:
             value_matrix = self.dkvmn.update_value_matrix(value_matrix, action, answer, counter, concept_counter)
 
         # update counters
@@ -72,47 +67,44 @@ class DKVMNAnalyzer():
             wrong_response_count_prob = np.sum(probs_diff > 0)
             wrong_response_count_mastery = np.sum(mastery_diff > 0)
 
-        ########### calculate probability decrease statistic
-        prob_pos_update = probs_diff[probs_diff >= 0]
-        prob_neg_update = probs_diff[probs_diff <0] 
-
-        target_prev_prob = prev_probs[action_idx] 
-        target_prob_diff = probs_diff[action_idx]
-        target_prob      = probs[action_idx]
-
-        stat_summary_total = self.get_stats(probs_diff)
-        stat_summary_pos = self.get_stats(prob_pos_update) 
-        stat_summary_neg = self.get_stats(prob_neg_update)
+        # # calculate probability decrease statistic
+        # prob_pos_update = probs_diff[probs_diff >= 0]
+        # prob_neg_update = probs_diff[probs_diff <0]
+        #
+        # target_prev_prob = prev_probs[action_idx]
+        # target_prob_diff = probs_diff[action_idx]
+        # target_prob      = probs[action_idx]
+        #
+        # stat_summary_total = self.get_stats(probs_diff)
+        # stat_summary_pos = self.get_stats(prob_pos_update)
+        # stat_summary_neg = self.get_stats(prob_neg_update)
 
         # print(",".join([str(action_idx), str(target_prev_prob), str(target_prob), str(target_prob_diff), stat_summary_total, stat_summary_pos, stat_summary_neg]))
 
-        return value_matrix, counter, concept_counter, probs, mastery_level, wrong_response_count_prob, wrong_response_count_mastery
+        return value_matrix, counter, concept_counter, probs, mastery_level,\
+               wrong_response_count_prob, wrong_response_count_mastery
 
-    def get_stats(self, arr):
-        if len(arr) == 0: 
-            return "0,-1,-1,-1,-1"
-
-        arr_stat = list()
-        arr_stat.append(len(arr))
-        arr_stat.append(np.min(arr))
-        arr_stat.append(np.max(arr))
-        arr_stat.append(np.average(arr))
-        arr_stat.append(np.std(arr))  
-
-        '''
-        arr_min = np.min(arr)
-        arr_max = np.max(arr)
-        arr_avg = np.average(arr)
-        arr_std = np.std(arr)  
-        '''
-        stat_summary = ['{:.4f}'.format(x) for x in arr_stat]
-        return ",".join(stat_summary)
+    # def get_stats(self, arr):
+    #     if len(arr) == 0:
+    #         return "0,-1,-1,-1,-1"
+    #
+    #     arr_stat = list()
+    #     arr_stat.append(len(arr))
+    #     arr_stat.append(np.min(arr))
+    #     arr_stat.append(np.max(arr))
+    #     arr_stat.append(np.average(arr))
+    #     arr_stat.append(np.std(arr))
+    #
+    #     '''
+    #     arr_min = np.min(arr)
+    #     arr_max = np.max(arr)
+    #     arr_avg = np.average(arr)
+    #     arr_std = np.std(arr)
+    #     '''
+    #     stat_summary = ['{:.4f}'.format(x) for x in arr_stat]
+    #     return ",".join(stat_summary)
          
-    def analysis(self, test_q, test_qa, scenario='best', ordering='permutation'):
-        # self.test_response()
-
-        # self.testset_analysis(test_q, test_qa)
-
+    def analysis(self, scenario_type='best', ordering='permutation'):
         print('analysis')
         # if scenario == 'best':
         # self.scenario = BestScenario(ordering, self.num_actions)
@@ -121,58 +113,51 @@ class DKVMNAnalyzer():
         # elif scenario == 'random':
         # self.scenario = RandomScenario(self.num_actions, self.dkvmn)
 
-        self.scenario = MaxProbScenario(self.num_actions, self.dkvmn)
-        self.scenario_analysis()
+        self.scenario_analysis(scenario.MaxProbScenario(self.num_actions, self.dkvmn))
 
-
-    def scenario_analysis(self):
-
+    def scenario_analysis(self, given_scenario):
         print('Scenario Analysis')
-        self.init_state()
-        log_path = os.path.join(self.path, self.scenario.get_name())
 
-        self.logger = set_logger('aDKVMN', log_path, 'summary.log', 'INFO')
+        self.value_matrix = self.init_value_matrix
 
-        self.logger_avg_prob = set_logger('aDKVMN_avg_prob', log_path, 'avg_prob.log', self.args.logging_level, display=False)
-        self.logger_avg_prob.info('#'*120)
-        f_avg_prob = open(os.path.join('log', log_path, 'avg_prob.result'), 'w')
+        log_time = time.strftime('%Y_%m_%d_%H_%M', time.localtime())
+        log_time_string = '#'*120 + '\n' + log_time + '\n' + '#'*120
+        logging_level = self.args.logging_level
+        log_path = os.path.join(self.path, given_scenario.get_name())
 
-        self.logger_dist = set_logger('aDKVMN_dist', log_path, 'dist.log', self.args.logging_level, display=False)
-        self.logger_dist.info('#'*120)
+        logger_avg_prob = utils.CustomLogger('aDKVMN_avg_prob', log_path, 'avg_prob', logging_level, display_flag=False)
+        logger_avg_prob.debug(log_time_string)
 
-        self.logger_path = set_logger('aDKVMN_path', log_path, 'path.log', self.args.logging_level, display=False)
-        self.logger_path.info('#'*120)
+        logger_dist = utils.CustomLogger('aDKVMN_dist', log_path, 'dist', logging_level, display_flag=False)
+        logger_dist.debug(log_time_string)
 
-        # probs_avg_list = list()
-        # probs_avg_list.append(self.init_probs_avg)
+        logger_path = utils.CustomLogger('aDKVMN_path', log_path, 'path', logging_level, display_flag=False)
+        logger_path.debug(log_time_string)
 
+        logger_avg_prob.info('{:.4f}'.format(self.init_probs_avg))
+        logger_dist.info(utils.float2str_list(self.init_probs))
 
-        self.logger_dist.info(float2str_list(self.init_probs))
         for cycle_idx in range(self.max_cycle_num):
 
             for step_idx in range(self.num_actions):
-                action_idx, answer = self.scenario.get_action(self.value_matrix)
+                action_idx, answer = given_scenario.get_action(self.value_matrix)
 
                 prev_prob = self.get_probability(self.value_matrix)[action_idx]
 
-                self.value_matrix, _, _, probs, _, wrong_response_count_prob, wrong_response_count_mastery  = self.update_state(action_idx, answer)
-                # probs_avg_list.append(np.average(probs))
-                self.logger_avg_prob.info('{:.4f}'.format(np.average(probs)))
-                f_avg_prob.write('{:.4f}\n'.format(np.average(probs)))
+                self.value_matrix, _, _, probs, _, _, _ = self.update_state(action_idx, answer)
+                logger_avg_prob.info('{:.4f}'.format(np.average(probs)))
 
-                self.logger_path.info('{:3d}, {: .4f}, {: .4f}'.format(action_idx+1, prev_prob, probs[action_idx]))
+                logger_path.info('{:3d}, {: .4f}, {: .4f}'.format(action_idx+1, prev_prob, probs[action_idx]))
 
                 if action_idx == self.num_actions-1:
-                    self.logger_dist.info(float2str_list(probs))
+                    logger_dist.info(utils.float2str_list(probs))
 
-        # self.logger_avg_prob.info(float2str_list(probs_avg_list))
-
-
+    ''' 
     def testset_analysis_with_run(self, test_q, test_qa, checkpoint_dir='', selected_mastery_index=-1):
         print('Testset Analysis')
 
         log_path = self.path
-        self.logger = set_logger('aDKVMN', log_path, 'test.log', 'INFO')
+        self.logger = CustomLogger('aDKVMN', log_path, 'test.log', 'INFO')
         self.logger.info('#'*120)
         self.logger.info(self.dkvmn.model_dir)
         self.logger.info('Test')
@@ -264,7 +249,7 @@ class DKVMNAnalyzer():
         # self.logger.info('Test auc : %3.4f, Test accuracy : %3.4f' % (test_auc, test_accuracy))
 
         return pred_list_2d, target_list_2d, test_auc, test_accuracy
-
+    '''
 
     def filter_result_with_threshold(self, target, pred, q, th=0):
         unique_item = np.unique(q)
